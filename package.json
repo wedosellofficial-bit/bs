@@ -1,0 +1,22 @@
+{
+  "name": "billions-store",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build tooling for the Billions Store storefront. Nothing here runs on the server - the compiled output in public_html/assets is committed.",
+  "scripts": {
+    "css": "tailwindcss -i ./resources/css/app.css -o ./public_html/assets/css/app.css --minify",
+    "css:watch": "tailwindcss -i ./resources/css/app.css -o ./public_html/assets/css/app.css --watch",
+    "fonts": "node resources/build/copy-fonts.mjs",
+    "vendor": "node resources/build/copy-vendor.mjs",
+    "build": "npm run fonts && npm run vendor && npm run css"
+  },
+  "devDependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.5",
+    "@fontsource/instrument-serif": "^5.2.5",
+    "@fontsource/inter": "^5.2.5",
+    "@tailwindcss/cli": "^4.3.3",
+    "esbuild": "^0.28.1",
+    "qrcode": "^1.5.4",
+    "tailwindcss": "^4.3.3"
+  }
+}

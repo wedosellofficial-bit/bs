@@ -1,0 +1,26 @@
+# Secrets. Never commit. On the server this file must be chmod 600.
+.env
+.env.local
+.env.*.local
+
+# Build tooling only. The *output* (public_html/assets) IS committed, because
+# Hostinger cannot run npm.
+/node_modules/
+
+# Runtime storage. Directories are kept via .gitkeep; contents are not tracked.
+/storage/nft/*
+!/storage/nft/.gitkeep
+!/storage/nft/preview/
+/storage/nft/preview/*
+!/storage/nft/preview/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/tmp/*
+!/storage/tmp/.gitkeep
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

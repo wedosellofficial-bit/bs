@@ -1,0 +1,633 @@
+@import "tailwindcss";
+
+/* Scan the PHP templates for class names. Tailwind v4 auto-detects
+   sources relative to the CSS file, but app/ sits outside that root. */
+@source "../../app/views";
+@source "../../app/controllers";
+
+/* =====================================================================
+   Billions Store - design tokens
+
+   Type pairing
+   ------------
+   Instrument Serif  display  - a high-contrast serif with real character.
+                                Chosen because an ordinals collection is
+                                closer to an auction catalogue than a SaaS
+                                dashboard, and a grotesque headline would
+                                have read as the default template.
+   Inter             body     - neutral, excellent at 13-15px, wide range.
+   IBM Plex Mono     mono     - addresses, txids, inscription ids, prices.
+                                Slashed zero and a disambiguated 1/l/I,
+                                which matters when someone is eyeballing
+                                a payout address against their wallet.
+
+   All three are self-hosted from woff2 in assets/fonts. No CDN: the
+   wallet page displays a deposit address, and a third-party font request
+   from that page hands a logging server the timing and referrer.
+
+   Colour
+   ------
+   A warm near-black rather than #000, with an amber accent that ties to
+   bitcoin without being the literal #F7931A logo orange. Mint is reserved
+   for confirmations and credits; it never appears decoratively, so a
+   green pill always means "settled".
+   ===================================================================== */
+
+@theme {
+  /* --- type ------------------------------------------------------- */
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- surfaces --------------------------------------------------- */
+  --color-ink-950: #08080a;   /* page */
+  --color-ink-900: #0e0e12;   /* card */
+  --color-ink-850: #14141a;   /* raised card, input */
+  --color-ink-800: #1c1c24;   /* border */
+  --color-ink-700: #2a2a35;   /* border, hover */
+  --color-ink-600: #3d3d4b;
+  --color-ink-500: #6b6b7b;   /* muted text */
+  --color-ink-400: #8b8b9c;
+  --color-ink-300: #a8a8b8;   /* secondary text */
+  --color-ink-200: #cfcfda;
+  --color-ink-100: #e8e8ef;   /* primary text */
+
+  /* --- accent ----------------------------------------------------- */
+  --color-ember-50: #fef6ec;
+  --color-ember-300: #f7c489;
+  --color-ember-400: #f4ad5f;
+  --color-ember-500: #f2a03d;  /* primary accent */
+  --color-ember-600: #d9821f;
+  --color-ember-700: #a85f13;
+  --color-ember-900: #402706;
+
+  /* --- semantic --------------------------------------------------- */
+  --color-mint-400: #7dd3c0;   /* confirmed, credited */
+  --color-mint-600: #2f9e86;
+  --color-mint-900: #10312b;
+
+  --color-rose-400: #f2757a;   /* failed, debit */
+  --color-rose-600: #d13b41;
+  --color-rose-900: #3d1113;
+
+  --color-amber-400: #e3b341;  /* pending, needs review */
+  --color-amber-900: #35290a;
+
+  /* --- spacing scale ---------------------------------------------
+     4px base. The whole interface is built from these steps; anything
+     off-scale is a mistake, not a nuance. */
+  --spacing: 0.25rem;
+
+  /* --- radii ------------------------------------------------------ */
+  --radius-card: 0.625rem;
+  --radius-pill: 999px;
+
+  /* --- shadow ----------------------------------------------------- */
+  --shadow-lift: 0 1px 0 0 rgb(255 255 255 / 0.03) inset,
+                 0 12px 32px -12px rgb(0 0 0 / 0.6);
+}
+
+/* =====================================================================
+   Self-hosted faces. Copied from node_modules by resources/build/copy-fonts.mjs.
+   font-display: swap so a cold cache shows text immediately in the
+   fallback rather than an invisible page.
+   ===================================================================== */
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("../fonts/instrument-serif-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("../fonts/instrument-serif-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("../fonts/inter-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("../fonts/inter-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("../fonts/inter-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/plex-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* =====================================================================
+   Base
+   ===================================================================== */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: var(--color-ink-700) var(--color-ink-950);
+  }
+
+  body {
+    background-color: var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Everything is readable at 360px; this stops a long unbroken token
+       id from widening the whole document. */
+    overflow-wrap: break-word;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--color-ink-100);
+  }
+
+  /* Numerals line up in tables when they are tabular. Prices in a column
+     that jitter by glyph width are hard to compare at a glance. */
+  table, .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Visible keyboard focus everywhere, including on elements that have
+     had their default outline removed by a utility class. */
+  :focus-visible {
+    outline: 2px solid var(--color-ember-500);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Pointer users do not get a focus ring on click; keyboard users
+     always do. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background: var(--color-ember-700);
+    color: var(--color-ink-100);
+  }
+
+  ::placeholder {
+    color: var(--color-ink-500);
+  }
+
+  /* Respect the OS setting. Animation here is decoration, not
+     information, so it can all be switched off without losing meaning. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* =====================================================================
+   Components
+   ===================================================================== */
+
+@layer components {
+  /* --- identifiers ------------------------------------------------
+     Addresses, txids and inscription ids. Always mono, never wrapped
+     mid-string: a broken address is one someone will copy incorrectly. */
+  .ident {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    color: var(--color-ink-300);
+  }
+
+  .ident-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+    padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2);
+    margin: calc(var(--spacing) * -1) calc(var(--spacing) * -2);
+    border-radius: 0.375rem;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  .ident-copy:hover {
+    background: var(--color-ink-800);
+    color: var(--color-ink-100);
+  }
+
+  .ident-copy[data-copied="true"] {
+    color: var(--color-mint-400);
+  }
+
+  /* --- price ------------------------------------------------------ */
+  .price {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  /* --- surfaces --------------------------------------------------- */
+  .card {
+    background: var(--color-ink-900);
+    border: 1px solid var(--color-ink-800);
+    border-radius: var(--radius-card);
+  }
+
+  .card-raised {
+    background: var(--color-ink-850);
+    border: 1px solid var(--color-ink-800);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-lift);
+  }
+
+  /* --- badges ----------------------------------------------------- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+    padding: calc(var(--spacing) * 0.75) calc(var(--spacing) * 2.5);
+    border-radius: var(--radius-pill);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .badge-listed   { background: var(--color-ember-900); color: var(--color-ember-300); border-color: var(--color-ember-700); }
+  .badge-ok       { background: var(--color-mint-900);  color: var(--color-mint-400);  border-color: var(--color-mint-600); }
+  .badge-pending  { background: var(--color-amber-900); color: var(--color-amber-400); border-color: #6b5518; }
+  .badge-failed   { background: var(--color-rose-900);  color: var(--color-rose-400);  border-color: var(--color-rose-600); }
+  .badge-muted    { background: var(--color-ink-850);   color: var(--color-ink-400);   border-color: var(--color-ink-700); }
+
+  /* --- buttons ---------------------------------------------------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 5);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    /* 44px minimum touch target. */
+    min-height: 2.75rem;
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--color-ember-500);
+    color: #1a1206;
+    font-weight: 600;
+  }
+
+  .btn-primary:hover:not(:disabled) { background: var(--color-ember-400); }
+
+  .btn-secondary {
+    background: var(--color-ink-850);
+    border-color: var(--color-ink-700);
+    color: var(--color-ink-100);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-ink-800);
+    border-color: var(--color-ink-600);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-ink-300);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-ink-850);
+    color: var(--color-ink-100);
+  }
+
+  .btn-danger {
+    background: var(--color-rose-900);
+    border-color: var(--color-rose-600);
+    color: var(--color-rose-400);
+  }
+
+  .btn-danger:hover:not(:disabled) { background: #4d1518; }
+
+  .btn-sm {
+    padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 3);
+    min-height: 2rem;
+    font-size: 0.8125rem;
+  }
+
+  /* --- forms ------------------------------------------------------ */
+  .field {
+    width: 100%;
+    background: var(--color-ink-850);
+    border: 1px solid var(--color-ink-700);
+    border-radius: 0.5rem;
+    padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 3.5);
+    color: var(--color-ink-100);
+    font-size: 0.9375rem;
+    font-family: inherit;
+    min-height: 2.75rem;
+    transition: border-color 120ms ease;
+  }
+
+  .field:hover { border-color: var(--color-ink-600); }
+
+  .field:focus {
+    border-color: var(--color-ember-500);
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(242 160 61 / 0.15);
+  }
+
+  .field-mono {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+  }
+
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-ink-200);
+    margin-bottom: calc(var(--spacing) * 1.5);
+  }
+
+  .hint {
+    font-size: 0.8125rem;
+    color: var(--color-ink-500);
+    line-height: 1.5;
+  }
+
+  /* --- filter rail ------------------------------------------------ */
+  .filter-group {
+    border-top: 1px solid var(--color-ink-800);
+    padding: calc(var(--spacing) * 5) 0;
+  }
+
+  .filter-group:first-child { border-top: 0; }
+
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2.5);
+    padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2);
+    margin-inline: calc(var(--spacing) * -2);
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--color-ink-300);
+    transition: background-color 120ms ease, color 120ms ease;
+    /* Comfortable target without making the rail enormous. */
+    min-height: 2.125rem;
+  }
+
+  .check-row:hover {
+    background: var(--color-ink-850);
+    color: var(--color-ink-100);
+  }
+
+  .check-row input[type="checkbox"] {
+    accent-color: var(--color-ember-500);
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    cursor: pointer;
+  }
+
+  /* --- dual range slider -----------------------------------------
+     Two native range inputs stacked. Native gives keyboard support and
+     screen-reader semantics for free; a div-based slider gives neither
+     without a lot of ARIA that is usually wrong. */
+  .range-stack {
+    position: relative;
+    height: 2rem;
+  }
+
+  .range-stack input[type="range"] {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    width: 100%;
+    height: 2rem;
+    margin: 0;
+    background: none;
+    appearance: none;
+    /* The track is drawn by .range-track underneath; only the thumbs of
+       these inputs should catch the pointer, or the upper input would
+       swallow every click meant for the lower one. */
+    pointer-events: none;
+  }
+
+  .range-stack input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    pointer-events: auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 50%;
+    background: var(--color-ember-500);
+    border: 2px solid var(--color-ink-950);
+    cursor: grab;
+  }
+
+  .range-stack input[type="range"]::-moz-range-thumb {
+    pointer-events: auto;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 50%;
+    background: var(--color-ember-500);
+    border: 2px solid var(--color-ink-950);
+    cursor: grab;
+  }
+
+  .range-track {
+    position: absolute;
+    top: 50%;
+    inset-inline: 0;
+    height: 3px;
+    transform: translateY(-50%);
+    background: var(--color-ink-700);
+    border-radius: var(--radius-pill);
+  }
+
+  .range-fill {
+    position: absolute;
+    height: 100%;
+    background: var(--color-ember-500);
+    border-radius: var(--radius-pill);
+  }
+
+  /* --- tables ----------------------------------------------------- */
+  .table-wrap {
+    /* Wide tables scroll inside their own container; the page body never
+       scrolls sideways. */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .data-table th {
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-ink-500);
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    border-bottom: 1px solid var(--color-ink-800);
+    white-space: nowrap;
+  }
+
+  .data-table td {
+    padding: calc(var(--spacing) * 3);
+    border-bottom: 1px solid var(--color-ink-800);
+    color: var(--color-ink-200);
+    vertical-align: middle;
+  }
+
+  .data-table tbody tr:hover td { background: var(--color-ink-900); }
+  .data-table tbody tr:last-child td { border-bottom: 0; }
+
+  /* --- flash ------------------------------------------------------ */
+  .flash {
+    display: flex;
+    gap: calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 3.5) calc(var(--spacing) * 4);
+    border-radius: var(--radius-card);
+    border: 1px solid;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .flash-success { background: var(--color-mint-900); border-color: var(--color-mint-600); color: #b9ede0; }
+  .flash-error   { background: var(--color-rose-900); border-color: var(--color-rose-600); color: #ffc9cb; }
+  .flash-info    { background: var(--color-ink-850);  border-color: var(--color-ink-700);  color: var(--color-ink-200); }
+
+  /* --- skip link -------------------------------------------------- */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+  }
+
+  .skip-link:focus {
+    left: calc(var(--spacing) * 4);
+    top: calc(var(--spacing) * 4);
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
+    background: var(--color-ember-500);
+    color: #1a1206;
+    border-radius: 0.375rem;
+  }
+
+  /* --- media ------------------------------------------------------ */
+  .art-frame {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background:
+      linear-gradient(135deg, var(--color-ink-850) 0%, var(--color-ink-900) 100%);
+  }
+
+  .art-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    /* Pixel art is common in ordinals collections and must not be
+       smoothed into mush by the browser's default scaler. */
+    image-rendering: pixelated;
+    transition: transform 300ms cubic-bezier(0.2, 0, 0.2, 1);
+  }
+
+  .nft-card:hover .art-frame img { transform: scale(1.03); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nft-card:hover .art-frame img { transform: none; }
+  }
+}
+
+@layer utilities {
+  /* Screen-reader-only, but focusable. */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .grid-fade {
+    transition: opacity 150ms ease;
+  }
+
+  .grid-fade[data-loading="true"] {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}

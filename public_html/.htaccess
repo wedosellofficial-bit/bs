@@ -1,0 +1,110 @@
+# =====================================================================
+# Billions Store - public_html/.htaccess
+#
+# Two jobs: route every request through index.php, and make sure nothing
+# but index.php and assets/ can ever be fetched directly.
+#
+# Note on the belt-and-braces rules below: app/, storage/ and .env live
+# ABOVE this directory, so they are already unreachable over HTTP. The
+# guards are here because the most common way these apps leak source is a
+# deploy that accidentally drops app/ inside public_html - at which point
+# these rules are the only thing standing between a visitor and your
+# database password.
+# =====================================================================
+
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Force HTTPS. Hostinger terminates TLS upstream, so trust
+    # X-Forwarded-Proto when HTTPS is not set directly.
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{HTTP_HOST} !^localhost [NC]
+    RewriteCond %{HTTP_HOST} !^127\.0\.0\.1
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Hard block on application internals, in case of a misdeploy.
+    RewriteRule ^(app|storage|bin|resources|migrations|node_modules)(/|$) - [F,L]
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+    RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|tailwind\.config\.js|\.env.*)$ - [F,L]
+
+    # Real files and directories in public_html are served as-is
+    # (assets/). Everything else is the application.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# If mod_rewrite is unavailable the site must fail closed, not serve a
+# directory listing of the source.
+<IfModule !mod_rewrite.c>
+    <FilesMatch "\.(php|phtml|inc)$">
+        Require all denied
+    </FilesMatch>
+    <Files "index.php">
+        Require all granted
+    </Files>
+</IfModule>
+
+# Only index.php is allowed to execute. Nothing else in public_html is
+# PHP, so anything that shows up here (an upload that slipped past
+# validation, a leftover installer) is denied by default.
+<FilesMatch "\.(?i:php|phtml|php3|php4|php5|php7|php8|phar|pl|py|cgi|sh)$">
+    Require all denied
+</FilesMatch>
+<Files "index.php">
+    Require all granted
+</Files>
+
+<IfModule mod_headers.c>
+    # qrcode.min.js and app.js are self-hosted; no external script,
+    # style, font or image origin is permitted. A deposit page must not
+    # be able to phone an address home.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+    # 1 year HSTS. Remove the preload token if you are not ready for it.
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    # Never let a caching layer hold a page rendered for a logged-in user.
+    <FilesMatch "index\.php$">
+        Header always set Cache-Control "no-store, private"
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    # Asset filenames carry a ?v= build stamp, so a long TTL is safe.
+    ExpiresByType text/css                  "access plus 1 year"
+    ExpiresByType application/javascript    "access plus 1 year"
+    ExpiresByType font/woff2                "access plus 1 year"
+    ExpiresByType image/svg+xml             "access plus 1 month"
+    ExpiresByType image/webp                "access plus 1 month"
+    ExpiresByType image/png                 "access plus 1 month"
+    ExpiresByType image/jpeg                "access plus 1 month"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# Upload cap for the admin NFT importer. Hostinger allows raising these
+# per-directory via .htaccess on most plans; if yours ignores them, set
+# them in hPanel > PHP Configuration instead.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 16M
+    php_value post_max_size 20M
+</IfModule>
+
+ErrorDocument 400 /index.php
+ErrorDocument 401 /index.php
+ErrorDocument 403 /index.php
+ErrorDocument 404 /index.php
