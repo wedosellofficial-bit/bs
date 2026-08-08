@@ -101,6 +101,7 @@ chmod 600 .env
 php -r "echo 'APP_KEY=' . base64_encode(random_bytes(32)) . PHP_EOL;"   >> .env
 php -r "echo 'CRON_TOKEN=' . bin2hex(random_bytes(24)) . PHP_EOL;"      >> .env
 
+php bin/doctor.php             # confirms the environment can actually run this
 php bin/migrate.php
 php bin/seed.php              # 60 generated inscriptions, admin + test buyer
 
@@ -110,6 +111,96 @@ php -S 127.0.0.1:8080 -t public_html public_html/index.php
 Set `MAIL_TRANSPORT=log` locally and verification/reset emails are written
 to `storage/logs/mail/` instead of being sent — open the file and click the
 link.
+
+### Preflight check
+
+```bash
+php bin/doctor.php
+```
+
+Checks PHP version and extensions, that `app/`, `storage/` and `.env`
+are outside the web root, that the compiled assets exist, that storage is
+writable, that `.env` is filled in, and that the database is reachable
+with migrations applied. Run it after first setup and again after
+uploading to Hostinger — most "it doesn't work" reports are one of these,
+and this finds which one in a few seconds instead of one page load at a
+time.
+
+### Testing on XAMPP before Hostinger
+
+XAMPP's own document root only serves what is inside `htdocs/`, but this
+app needs `app/`, `bin/` and `storage/` to sit *next to* `public_html/`,
+not inside it — see [Layout](#layout). Two ways to satisfy that:
+
+**Option A — clone outside `htdocs`, point Apache at `public_html/`.**
+Keeps the layout identical to what you will upload to Hostinger, so
+nothing behaves differently between local and production.
+
+1. Clone the repo anywhere *outside* `htdocs`, e.g. `C:\dev\billions-store`
+   (Windows) or `~/dev/billions-store` (mac/Linux).
+2. XAMPP → **Apache → Config → httpd-vhosts.conf**, add:
+   ```apache
+   <VirtualHost *:8080>
+       DocumentRoot "C:/dev/billions-store/public_html"
+       <Directory "C:/dev/billions-store/public_html">
+           AllowOverride All
+           Require all granted
+       </Directory>
+   </VirtualHost>
+   ```
+   (Adjust the path; on mac/Linux XAMPP it's usually under
+   `/opt/lampp/apache2/conf/extra/`.) Also add `Listen 8080` near the top
+   of `httpd.conf` if 8080 isn't already listened on.
+3. Restart Apache from the XAMPP control panel.
+4. Visit `http://localhost:8080/`.
+
+**Option B — clone straight into `htdocs`.** Faster to set up, no vhost
+editing, but note the URL includes the folder name:
+
+```
+htdocs/
+└── billions-store/
+    ├── public_html/
+    ├── app/
+    ├── bin/
+    └── storage/
+```
+
+Visit `http://localhost/billions-store/public_html/`. This works because
+`app/`/`storage/` are still outside `public_html/` — just both under
+`billions-store/` rather than directly under `htdocs/`. Do **not** put
+`app/` or `storage/` directly inside `htdocs/` itself, or Apache can serve
+them.
+
+**Either way, then:**
+
+1. Start **Apache** and **MySQL** from the XAMPP control panel.
+2. phpMyAdmin (`http://localhost/phpmyadmin`) → create a database, e.g.
+   `billions`. XAMPP's default MySQL user is `root` with **no password**.
+3. `cp .env.example .env`, then set:
+   ```
+   APP_ENV=development
+   APP_URL=http://localhost:8080          (or .../billions-store/public_html for Option B)
+   DB_HOST=127.0.0.1
+   DB_NAME=billions
+   DB_USER=root
+   DB_PASS=
+   MAIL_TRANSPORT=log
+   ```
+   `APP_ENV=development` matters here specifically: with it set to
+   `production` (or left blank), a broken page shows only a generic
+   "Something went wrong" screen with a reference code — correct behaviour
+   for a live store, useless while you're debugging. In development the
+   real exception, file and line print directly to the page.
+4. `php bin/doctor.php` — if XAMPP's PHP isn't on your PATH, run it via
+   XAMPP's own binary instead (Windows: `C:\xampp\php\php.exe bin\doctor.php`;
+   mac: `/Applications/XAMPP/xamppfiles/bin/php bin/doctor.php`).
+5. `php bin/migrate.php` then `php bin/seed.php`.
+6. Reload the site.
+
+If something still won't load, `storage/logs/app-YYYY-MM-DD.log` has the
+exact error and reference code even when `APP_ENV=production` hides it
+from the browser.
 
 ### Front-end build (local only)
 
