@@ -1,6 +1,6 @@
 /**
  * Copies the woff2 files we use out of node_modules into
- * public_html/assets/fonts, under short stable names.
+ * assets/fonts, under short stable names.
  *
  * The copied files ARE committed. Hostinger has no npm, and the fonts
  * must be self-hosted anyway - a CDN request from the wallet page would
@@ -13,7 +13,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const target = resolve(root, 'public_html/assets/fonts');
+const target = resolve(root, 'assets/fonts');
 
 const files = [
   ['@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2', 'instrument-serif-400.woff2'],

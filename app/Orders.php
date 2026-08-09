@@ -26,8 +26,12 @@ use RuntimeException;
  *
  *  - Two purchases by DIFFERENT users of the SAME item. Neither user lock
  *    helps, because they are different rows. Closed by locking the nft row
- *    FOR UPDATE inside the transaction, and backstopped by
- *    UNIQUE(nft_id) on orders.
+ *    FOR UPDATE inside the transaction: the second transaction blocks on
+ *    that lock, and once it can proceed it sees status <> 'listed' and
+ *    stops. There is deliberately no unique key on orders.nft_id backing
+ *    this up - see migration 006 - because that would also forbid ever
+ *    reselling an item after a refund, which is a normal thing to do,
+ *    not a race.
  *
  * Lock ordering is always user-then-item. If some future code path locks
  * them the other way round, two concurrent purchases can deadlock; keeping
@@ -208,10 +212,12 @@ final class Orders
                     [$nftId]
                 );
 
-                // UNIQUE(nft_id) on orders means a relisted item cannot be
-                // bought again while the refunded order still points at it.
-                // The refunded order is detached so the item is genuinely
-                // available.
+                // The refunded order row stays exactly where it is - it is
+                // the record of what happened, and orders.nft_id carries no
+                // unique constraint that a leftover row could violate (see
+                // migration 006). A future purchase of this same nft_id
+                // simply becomes a second, later order row; only the
+                // now-irrelevant transfer_queue entry needs clearing.
                 Database::run('DELETE FROM transfer_queue WHERE order_id = ?', [$orderId]);
             }
         });

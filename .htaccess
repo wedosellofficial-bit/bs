@@ -1,15 +1,20 @@
 # =====================================================================
-# Billions Store - public_html/.htaccess
+# Billions Store - root .htaccess
 #
-# Two jobs: route every request through index.php, and make sure nothing
-# but index.php and assets/ can ever be fetched directly.
+# This file sits at the web root, alongside index.php, app/, bin/,
+# storage/ and resources/ - all deployed as one tree, because some
+# hosting deploy tools (Hostinger's "deploy from GitHub" among them)
+# clone straight into the document root with no way to keep application
+# code outside it. There is no filesystem boundary doing that job here;
+# app/, bin/, storage/ and resources/ each carry their own .htaccess
+# with `Require all denied`, and that - not "it lives one level up" - is
+# what keeps them unreachable. The rules below are a second, independent
+# layer that does not rely on those per-directory files existing: even
+# if one were ever deleted by accident, the blanket deny rules here would
+# still stop app/ or .env being served.
 #
-# Note on the belt-and-braces rules below: app/, storage/ and .env live
-# ABOVE this directory, so they are already unreachable over HTTP. The
-# guards are here because the most common way these apps leak source is a
-# deploy that accidentally drops app/ inside public_html - at which point
-# these rules are the only thing standing between a visitor and your
-# database password.
+# Two jobs, beyond that: route every request through index.php, and make
+# sure nothing but index.php and assets/ can ever be fetched directly.
 # =====================================================================
 
 Options -Indexes -MultiViews
@@ -27,8 +32,13 @@ DirectoryIndex index.php
     RewriteCond %{HTTP_HOST} !^127\.0\.0\.1
     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-    # Hard block on application internals, in case of a misdeploy.
-    RewriteRule ^(app|storage|bin|resources|migrations|node_modules)(/|$) - [F,L]
+    # Hard block on application internals. This duplicates what
+    # app/.htaccess, bin/.htaccess, storage/.htaccess and
+    # resources/.htaccess already enforce with `Require all denied` -
+    # deliberately: this fires at the rewrite phase before Apache even
+    # decides which directory's .htaccess applies, so it holds even if a
+    # deploy step ever dropped one of those four files.
+    RewriteRule ^(app|storage|bin|resources|node_modules)(/|$) - [F,L]
     RewriteRule (^|/)\.(?!well-known/) - [F,L]
     RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|tailwind\.config\.js|\.env.*)$ - [F,L]
 

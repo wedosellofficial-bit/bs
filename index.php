@@ -3,15 +3,26 @@
 declare(strict_types=1);
 
 /**
- * Front controller. The only PHP file inside the web root.
+ * Front controller. The only PHP file meant to be requested directly.
  *
- * Everything else - application code, templates, migrations, uploaded
- * media, and .env - lives one level up, where Apache cannot reach it. If
- * you ever find a second .php file in this directory, something has gone
- * wrong with the deploy.
+ * This whole tree - index.php, app/, bin/, storage/, resources/ - is
+ * deployed as one unit, because some hosting deploy tools (Hostinger's
+ * "deploy from GitHub" among them) clone a repository straight into the
+ * document root with no option to point at a subfolder. There is no
+ * filesystem boundary putting app/ or storage/ outside what Apache can
+ * reach, the way there would be with a manual upload that keeps them as
+ * siblings of a separate public_html/.
+ *
+ * The boundary here is enforced entirely by .htaccess instead:
+ * app/.htaccess, bin/.htaccess, storage/.htaccess and
+ * resources/.htaccess each carry `Require all denied`, and the root
+ * .htaccess denies every dotfile (.env included) and every .php file
+ * except this one. If you ever find a second working .php file
+ * reachable over HTTP, or an .htaccess missing from one of those four
+ * directories, something has gone wrong with the deploy.
  */
 
-require dirname(__DIR__) . '/app/bootstrap.php';
+require __DIR__ . '/app/bootstrap.php';
 
 use App\Controllers\Admin\AdminAnnouncementController;
 use App\Controllers\Admin\AdminDepositController;

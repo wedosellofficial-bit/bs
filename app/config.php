@@ -3,8 +3,17 @@
 declare(strict_types=1);
 
 /**
- * Configuration. Reads `.env` from the project root (one level above
- * public_html) and returns a flat, dot-addressable array.
+ * Configuration. Reads `.env` from the project root - the same
+ * directory as index.php and app/ - and returns a flat, dot-addressable
+ * array.
+ *
+ * `.env` sitting alongside index.php, rather than a directory above it,
+ * is not a choice this app makes: it is where it has to be, because
+ * some hosting deploy tools clone the whole repository straight into
+ * the document root with no separate "above the web root" to put it in.
+ * What keeps it from being served is entirely .htaccess - the dotfile
+ * deny rule at the root - so double check that rule is intact after any
+ * change to the root .htaccess.
  *
  * This file is committed; `.env` is not. Anything secret belongs in
  * `.env` and must be referenced here through env(), never inlined.
@@ -110,7 +119,7 @@ return [
         // Cache-buster appended to asset URLs. Bump on deploy; falls back
         // to the compiled stylesheet's mtime so a forgotten bump still
         // invalidates.
-        'asset_version' => (string) @filemtime($root . '/public_html/assets/css/app.css') ?: '1',
+        'asset_version' => (string) @filemtime($root . '/assets/css/app.css') ?: '1',
     ],
 
     'db' => [

@@ -1,0 +1,23 @@
+# Billions Store - app/.htaccess
+#
+# This directory holds application source: controllers, views, migrations,
+# .env parsing logic. It has no reason to ever be requested directly, and
+# every reason not to be - migrations describe the schema, and a view
+# rendered raw instead of through index.php would leak whatever the last
+# controller happened to pass it.
+#
+# `Require all denied` is Apache 2.4's access-control directive and does
+# not depend on mod_rewrite at all - it is enforced at the authorization
+# phase, before rewriting or content handling ever runs. The 2.2-style
+# `Deny from all` is kept alongside it for any host still running the
+# older syntax; unlike `Require all denied`, an unrecognised `Deny from
+# all` is what old Apache falls back to, not the reverse, so both lines
+# together cover both Apache generations rather than one masking the
+# other.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

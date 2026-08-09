@@ -1,0 +1,14 @@
+# Billions Store - resources/.htaccess
+#
+# Build sources only: the Tailwind CSS input and the Node scripts that
+# copy fonts and bundle qrcode.js. None of it runs on the server - the
+# compiled output lives in assets/, which is deployed and web-reachable
+# on purpose. This directory does not need to be uploaded at all; this
+# file exists in case a deploy tool copies the whole repository anyway.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

@@ -50,10 +50,13 @@ final class Response
     }
 
     /**
-     * Stream a file from outside the web root through PHP.
+     * Stream a file that is not otherwise servable directly, through PHP.
      *
-     * NFT media is stored in storage/nft and served here so that an
-     * uploaded file can never be executed by Apache, and so that
+     * NFT media is stored in storage/nft, which carries its own
+     * `Require all denied` .htaccess - a direct request for it is
+     * refused by Apache before PHP ever runs. Routing it through here
+     * instead means an uploaded file can never be executed regardless of
+     * that .htaccess (defense in depth if it were ever lost), and that
      * unreleased inventory can be access-checked before a byte is sent.
      */
     public static function file(string $absolutePath, string $mime, string $etag, bool $public = true): never

@@ -31,11 +31,18 @@ CREATE TABLE orders (
 
     PRIMARY KEY (id),
 
-    -- One order per NFT. The purchase transaction relies on this: even if
-    -- two requests somehow both passed the status check, the second insert
-    -- fails rather than selling the same inscription twice.
-    UNIQUE KEY uniq_orders_nft (nft_id),
-
+    -- Deliberately NOT unique. An nft can be sold, refunded, and sold
+    -- again - each is a real, separate order and all of them stay in
+    -- the table, the same way a reversed ledger entry sits next to the
+    -- charge it reverses rather than replacing it. What stops the same
+    -- inscription being sold twice AT ONCE is Orders::purchase() taking
+    -- `SELECT ... FOR UPDATE` on the nft row before checking its status -
+    -- a concurrent second purchase blocks on that lock, then sees
+    -- status <> 'listed' once it can proceed, and never reaches this
+    -- table at all. A unique key here would additionally forbid ever
+    -- reselling a refunded item, which is not a race condition, just a
+    -- normal thing this store needs to do.
+    KEY idx_orders_nft (nft_id),
     KEY idx_orders_user_created (user_id, created_at),
     KEY idx_orders_status (status, created_at),
 

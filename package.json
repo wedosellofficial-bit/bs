@@ -2,10 +2,10 @@
   "name": "billions-store",
   "private": true,
   "version": "1.0.0",
-  "description": "Build tooling for the Billions Store storefront. Nothing here runs on the server - the compiled output in public_html/assets is committed.",
+  "description": "Build tooling for the Billions Store storefront. Nothing here runs on the server - the compiled output in assets/ is committed.",
   "scripts": {
-    "css": "tailwindcss -i ./resources/css/app.css -o ./public_html/assets/css/app.css --minify",
-    "css:watch": "tailwindcss -i ./resources/css/app.css -o ./public_html/assets/css/app.css --watch",
+    "css": "tailwindcss -i ./resources/css/app.css -o ./assets/css/app.css --minify",
+    "css:watch": "tailwindcss -i ./resources/css/app.css -o ./assets/css/app.css --watch",
     "fonts": "node resources/build/copy-fonts.mjs",
     "vendor": "node resources/build/copy-vendor.mjs",
     "build": "npm run fonts && npm run vendor && npm run css"

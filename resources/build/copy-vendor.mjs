@@ -1,6 +1,6 @@
 /**
  * Bundles the `qrcode` npm package into a single self-contained browser
- * IIFE at public_html/assets/js/qrcode.min.js.
+ * IIFE at assets/js/qrcode.min.js.
  *
  * Why bundle rather than link a CDN: the QR code on the deposit page
  * encodes a bitcoin URI containing the user's fresh deposit address.
@@ -18,7 +18,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const outDir = resolve(root, 'public_html/assets/js');
+const outDir = resolve(root, 'assets/js');
 
 await mkdir(outDir, { recursive: true });
 

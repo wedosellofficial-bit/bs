@@ -1,0 +1,16 @@
+# Billions Store - storage/.htaccess
+#
+# Uploaded NFT media and application logs. Media is served to browsers
+# through App\Controllers\MediaController, which validates the filename
+# against a strict pattern before it touches the filesystem - never by
+# linking into this directory directly. Serving straight from here would
+# skip that check, and would serve full-resolution originals and log
+# files (which can contain a request path or a truncated identifier) to
+# anyone who could guess or enumerate a filename.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

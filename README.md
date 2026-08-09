@@ -46,41 +46,72 @@ spending cap and an address allowlist, not before.
 ## Layout
 
 ```
-public_html/            <- the document root, and the ONLY web-reachable part
-├── index.php             front controller; the only .php file in here
+/ (repo root - deployed as the web root, all of it)
+├── index.php             front controller; the only .php file meant to be requested
 ├── .htaccess             rewrites, security headers, CSP, deny rules
-└── assets/               compiled CSS, JS, self-hosted fonts, images
-
-app/                    <- ABOVE the web root
-├── config.php            reads ../.env, returns a flat config array
-├── bootstrap.php         autoloader, error handling
-├── Database.php          PDO singleton, transactions with SAVEPOINT nesting
-├── Auth.php              sessions, Argon2id, CSRF, TOTP, guards
-├── Wallet.php            the ledger
-├── Payments.php          Coinbase Commerce charges + webhook handling
-├── Nft.php               catalog, filters, transfer queue
-├── Orders.php            the purchase transaction
-├── Ordinals.php          taproot payout policy, inscription ids, explorers
-├── lib/                  Bech32, Base58Check, Totp, RateLimiter, Mailer,
-│                         ImageStore, Router, View, Logger, Config, ...
-├── controllers/
-├── views/
-└── migrations/
-
-bin/                    <- CLI entry points (some also exposed over HTTP)
-├── migrate.php           apply migrations      (also /cron/migrate)
-├── cron.php              scheduled maintenance (also /cron/run)
-├── seed.php              sample data for local development
-├── reconcile.php         ledger vs cache reconciliation
-└── test.php              self-tests, no dependencies
-
-storage/                <- ABOVE the web root; uploaded media, logs
-resources/              <- build sources (Tailwind input, font/JS copy scripts)
+├── assets/               compiled CSS, JS, self-hosted fonts, images - web-reachable
+│
+├── app/                   application source - NOT reachable, see below
+│   ├── .htaccess           Require all denied
+│   ├── config.php          reads ../.env, returns a flat config array
+│   ├── bootstrap.php       autoloader, error handling
+│   ├── Database.php        PDO singleton, transactions with SAVEPOINT nesting
+│   ├── Auth.php            sessions, Argon2id, CSRF, TOTP, guards
+│   ├── Wallet.php          the ledger
+│   ├── Payments.php        Coinbase Commerce charges + webhook handling
+│   ├── Nft.php             catalog, filters, transfer queue
+│   ├── Orders.php          the purchase transaction
+│   ├── Ordinals.php        taproot payout policy, inscription ids, explorers
+│   ├── lib/                Bech32, Base58Check, Totp, RateLimiter, Mailer,
+│   │                       ImageStore, Router, View, Logger, Config, ...
+│   ├── controllers/
+│   ├── views/
+│   └── migrations/
+│
+├── bin/                   CLI entry points - NOT reachable
+│   ├── .htaccess           Require all denied
+│   ├── migrate.php         apply migrations      (also /cron/migrate)
+│   ├── cron.php            scheduled maintenance (also /cron/run)
+│   ├── seed.php            sample data for local development
+│   ├── doctor.php          preflight check - run this after every deploy
+│   ├── reconcile.php       ledger vs cache reconciliation
+│   └── test.php            self-tests, no dependencies
+│
+├── storage/               uploaded media, logs - NOT reachable
+│   └── .htaccess           Require all denied
+│
+├── resources/             build sources (Tailwind input, font/JS copy scripts) - NOT reachable, not needed at runtime
+│   └── .htaccess           Require all denied
+│
+└── .env                   never committed, created on the server directly
 ```
 
-If `app/` ends up inside `public_html`, the deploy is wrong. The
-`.htaccess` has hard deny rules for exactly that case, but they are a
-backstop, not the design.
+Everything above is deployed as one tree, on purpose. Some hosting
+deploy tools - Hostinger's "deploy from GitHub" among them - clone a
+repository straight into the document root, with no option to keep part
+of it outside. There is no *filesystem* boundary here putting `app/` or
+`storage/` beyond what Apache can reach, the way a manual two-tier
+upload (`app/` as a sibling of a separate `public_html/`) would give
+you.
+
+The boundary is enforced entirely by `.htaccess` instead, in two
+independent layers:
+
+1. `app/.htaccess`, `bin/.htaccess`, `storage/.htaccess` and
+   `resources/.htaccess` each carry `Require all denied` - Apache's
+   access-control directive, enforced before any rewriting or content
+   handling runs.
+2. The root `.htaccess` also hard-blocks the same four directories (and
+   every dotfile, `.env` included) at the rewrite level, so losing one
+   of the four files above by accident does not silently reopen it.
+
+Both layers are verified in this repository against a real Apache
+instance, not assumed from reading the directives: every path under
+`app/`, `bin/`, `storage/` and `resources/` returns 403, `.env` returns
+403, and static assets under `assets/` are still served directly. `php
+bin/doctor.php` checks that all four `.htaccess` files exist and contain
+the deny rule on every environment you run it in, including after a
+fresh deploy.
 
 ### No Composer dependencies
 
@@ -105,8 +136,17 @@ php bin/doctor.php             # confirms the environment can actually run this
 php bin/migrate.php
 php bin/seed.php              # 60 generated inscriptions, admin + test buyer
 
-php -S 127.0.0.1:8080 -t public_html public_html/index.php
+php -S 127.0.0.1:8080 index.php
 ```
+
+Note that PHP's built-in server, run this way, does not read `.htaccess`
+at all - so it will happily serve `/app/config.php` or `/.env` directly,
+which real Apache would refuse. That is expected for local development
+and is not a gap in the app: the protection is Apache's `.htaccess`
+mechanism specifically, which only Apache enforces. If you want to
+verify the deny rules themselves rather than just the application logic,
+run a real Apache instance against the repo root with `AllowOverride
+All`, which is exactly how this was verified before release.
 
 Set `MAIL_TRANSPORT=log` locally and verification/reset emails are written
 to `storage/logs/mail/` instead of being sent — open the file and click the
@@ -118,69 +158,29 @@ link.
 php bin/doctor.php
 ```
 
-Checks PHP version and extensions, that `app/`, `storage/` and `.env`
-are outside the web root, that the compiled assets exist, that storage is
-writable, that `.env` is filled in, and that the database is reachable
-with migrations applied. Run it after first setup and again after
-uploading to Hostinger — most "it doesn't work" reports are one of these,
-and this finds which one in a few seconds instead of one page load at a
-time.
+Checks PHP version and extensions, that `index.php` and the root
+`.htaccess` are present, that `app/`, `bin/`, `storage/` and `resources/`
+each have their own `.htaccess` with a deny rule, that the compiled
+assets exist, that storage is writable, that `.env` is filled in, and
+that the database is reachable with migrations applied. Run it after
+first setup and again after uploading to Hostinger — most "it doesn't
+work" reports are one of these, and this finds which one in a few
+seconds instead of one page load at a time.
 
 ### Testing on XAMPP before Hostinger
 
-XAMPP's own document root only serves what is inside `htdocs/`, but this
-app needs `app/`, `bin/` and `storage/` to sit *next to* `public_html/`,
-not inside it — see [Layout](#layout). Two ways to satisfy that:
+Since the whole repo deploys as one tree (see [Layout](#layout)), XAMPP
+setup is just "put the repo where Apache can see it":
 
-**Option A — clone outside `htdocs`, point Apache at `public_html/`.**
-Keeps the layout identical to what you will upload to Hostinger, so
-nothing behaves differently between local and production.
-
-1. Clone the repo anywhere *outside* `htdocs`, e.g. `C:\dev\billions-store`
-   (Windows) or `~/dev/billions-store` (mac/Linux).
-2. XAMPP → **Apache → Config → httpd-vhosts.conf**, add:
-   ```apache
-   <VirtualHost *:8080>
-       DocumentRoot "C:/dev/billions-store/public_html"
-       <Directory "C:/dev/billions-store/public_html">
-           AllowOverride All
-           Require all granted
-       </Directory>
-   </VirtualHost>
-   ```
-   (Adjust the path; on mac/Linux XAMPP it's usually under
-   `/opt/lampp/apache2/conf/extra/`.) Also add `Listen 8080` near the top
-   of `httpd.conf` if 8080 isn't already listened on.
-3. Restart Apache from the XAMPP control panel.
-4. Visit `http://localhost:8080/`.
-
-**Option B — clone straight into `htdocs`.** Faster to set up, no vhost
-editing, but note the URL includes the folder name:
-
-```
-htdocs/
-└── billions-store/
-    ├── public_html/
-    ├── app/
-    ├── bin/
-    └── storage/
-```
-
-Visit `http://localhost/billions-store/public_html/`. This works because
-`app/`/`storage/` are still outside `public_html/` — just both under
-`billions-store/` rather than directly under `htdocs/`. Do **not** put
-`app/` or `storage/` directly inside `htdocs/` itself, or Apache can serve
-them.
-
-**Either way, then:**
-
-1. Start **Apache** and **MySQL** from the XAMPP control panel.
-2. phpMyAdmin (`http://localhost/phpmyadmin`) → create a database, e.g.
+1. Clone the repo *into* `htdocs/`, e.g. `htdocs/billions-store/`, so
+   `htdocs/billions-store/index.php` exists directly.
+2. Start **Apache** and **MySQL** from the XAMPP control panel.
+3. phpMyAdmin (`http://localhost/phpmyadmin`) → create a database, e.g.
    `billions`. XAMPP's default MySQL user is `root` with **no password**.
-3. `cp .env.example .env`, then set:
+4. `cp .env.example .env` at the repo root (next to `index.php`), then set:
    ```
    APP_ENV=development
-   APP_URL=http://localhost:8080          (or .../billions-store/public_html for Option B)
+   APP_URL=http://localhost/billions-store
    DB_HOST=127.0.0.1
    DB_NAME=billions
    DB_USER=root
@@ -192,21 +192,25 @@ them.
    "Something went wrong" screen with a reference code — correct behaviour
    for a live store, useless while you're debugging. In development the
    real exception, file and line print directly to the page.
-4. `php bin/doctor.php` — if XAMPP's PHP isn't on your PATH, run it via
+5. `php bin/doctor.php` — if XAMPP's PHP isn't on your PATH, run it via
    XAMPP's own binary instead (Windows: `C:\xampp\php\php.exe bin\doctor.php`;
    mac: `/Applications/XAMPP/xamppfiles/bin/php bin/doctor.php`).
-5. `php bin/migrate.php` then `php bin/seed.php`.
-6. Reload the site.
+6. `php bin/migrate.php` then `php bin/seed.php`.
+7. Visit `http://localhost/billions-store/`.
 
-If something still won't load, `storage/logs/app-YYYY-MM-DD.log` has the
-exact error and reference code even when `APP_ENV=production` hides it
-from the browser.
+If the page 404s or shows "not found," it's almost always
+`AllowOverride All` missing for that directory in XAMPP's Apache config
+(`httpd.conf` / `httpd-xampp.conf`), which stops `.htaccess` — and
+therefore the rewrite that routes every request through `index.php` —
+from taking effect at all. If it loads but something is broken,
+`storage/logs/app-YYYY-MM-DD.log` has the exact error and reference code
+even when `APP_ENV=production` hides it from the browser.
 
 ### Front-end build (local only)
 
 ```bash
 npm install
-npm run build     # fonts + qrcode bundle + Tailwind, all into public_html/assets
+npm run build     # fonts + qrcode bundle + Tailwind, all into assets/
 ```
 
 The **output is committed** because Hostinger cannot run npm. Re-run
@@ -247,26 +251,43 @@ note the credentials. Hostinger prefixes both with your account id
 
 ### 2. Upload
 
-Over FTP/SFTP or the hPanel File Manager, so the account root looks like:
+Everything in this repository deploys as one tree, straight into
+`public_html`, so this works the same way whether you upload manually or
+use Hostinger's "deploy from GitHub" auto-deploy:
 
 ```
-/home/u123456789/
-├── public_html/      <- contents of public_html/ from this repo
-├── app/
-├── bin/
-├── storage/
-└── .env
+public_html/
+├── index.php
+├── .htaccess
+├── assets/
+├── app/            <- has its own .htaccess; not reachable over HTTP
+├── bin/            <- has its own .htaccess; not reachable over HTTP
+├── storage/        <- has its own .htaccess; not reachable over HTTP
+├── resources/       <- not needed at runtime, harmless if it's there
+└── .env             <- you create this; never comes from git
 ```
 
-`app/`, `bin/`, `storage/` and `.env` are **siblings of** `public_html`,
-never inside it. Skip `node_modules/` and `resources/` — neither is needed
-at runtime.
+**Manually (FTP/SFTP or hPanel File Manager):** upload the whole repo
+into `public_html`, then create `.env` there directly (step 4).
+
+**Git auto-deploy:** point it at this repository and branch; it clones
+straight into `public_html` and this layout is exactly what it expects.
+`.env` still will not come from git (it never should - see below), so
+create it the same way, in the same place, after the first deploy. If
+the deploy tool has an **environment variables** panel instead of a
+physical file, use that: `app/config.php` reads real process environment
+variables first and falls back to a `.env` file, so either works and the
+env-vars route survives a redeploy that wipes the filesystem, where a
+manually-placed `.env` file would not.
+
+Either way, skip `node_modules/` if you're doing this by hand - not
+needed at runtime, and a manual upload doesn't need to bring it along.
 
 ### 3. Permissions
 
 ```
 .env                 600
-app/  bin/           755 dirs, 644 files
+app/  bin/  resources/   755 dirs, 644 files
 storage/             755   (must be writable by PHP)
 storage/nft/         755
 storage/logs/        755
@@ -373,8 +394,15 @@ it told you about.
 
 ### 9. Check the deploy
 
+Run `php bin/doctor.php` over SSH if you have it - it checks all of the
+below in one command, including that each of `app/`, `bin/`, `storage/`
+and `resources/` actually has its `.htaccess` deny rule in place. If you
+don't have SSH, check by hand:
+
 - `https://your-domain/.env` → 403 or 404, **never** file contents
 - `https://your-domain/app/config.php` → 403 or 404
+- `https://your-domain/bin/seed.php` → 403 or 404
+- `https://your-domain/assets/css/app.css` → 200 (this one *should* load)
 - `https://your-domain/` → the storefront
 - **Admin → Overview** → reconciliation panel populates after the first
   cron run. If it stays empty, cron is not firing.
@@ -388,7 +416,8 @@ it told you about.
 1. **Admin → Inventory → Add inscription.** Paste the inscription id
    (`<64-hex reveal txid>i<index>`), a price, and traits as JSON. Upload
    an image — it is validated by magic bytes, re-encoded through GD to
-   strip metadata and payloads, and stored outside the web root.
+   strip metadata and payloads, and stored in storage/nft, which denies
+   direct access via its own .htaccess.
 2. **Recompute rarity** once the collection is complete. Rarity is stored
    and indexed so it can be a sort option.
 3. A buyer purchases; the order lands in **Admin → Transfer queue**.

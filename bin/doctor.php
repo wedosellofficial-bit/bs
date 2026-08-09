@@ -89,39 +89,49 @@ if (extension_loaded('gd')) {
 //---------------------------------------------------------------------
 section('Layout');
 
-is_dir($root . '/public_html')
-    ? report('ok', 'public_html/ present')
-    : report('fail', 'public_html/ present', 'not found');
+// This tree is deployed as one unit - index.php, app/, bin/, storage/
+// and resources/ all sit at the same level, because some hosting deploy
+// tools (Hostinger's "deploy from GitHub" among them) clone a repository
+// straight into the document root with no option to keep part of it
+// outside. The boundary is enforced entirely by .htaccess: each of the
+// four non-public directories must carry its own `Require all denied`,
+// and losing that file quietly is the single most damaging deploy
+// mistake this check can catch.
 
-is_file($root . '/public_html/index.php')
+is_file($root . '/index.php')
     ? report('ok', 'front controller present')
-    : report('fail', 'front controller present', 'public_html/index.php missing');
+    : report('fail', 'front controller present', 'index.php missing at the repo root');
 
-is_file($root . '/public_html/.htaccess')
-    ? report('ok', '.htaccess present')
-    : report('fail', '.htaccess present', 'rewrites and deny rules missing');
+is_file($root . '/.htaccess')
+    ? report('ok', 'root .htaccess present')
+    : report('fail', 'root .htaccess present', 'rewrites and deny rules missing');
 
-// The single most damaging deploy mistake: app/ inside the web root.
-is_dir($root . '/public_html/app')
-    ? report('fail', 'app/ is OUTSIDE the web root', 'found public_html/app - your source is downloadable')
-    : report('ok', 'app/ is outside the web root');
+foreach (['app', 'bin', 'storage', 'resources'] as $dir) {
+    $htaccess = $root . '/' . $dir . '/.htaccess';
 
-is_dir($root . '/public_html/storage')
-    ? report('fail', 'storage/ is outside the web root', 'found public_html/storage - uploads are directly reachable')
-    : report('ok', 'storage/ is outside the web root');
+    if (!is_file($htaccess)) {
+        report('fail', "{$dir}/.htaccess present", 'missing - this directory is currently web-reachable');
+        continue;
+    }
 
-is_file($root . '/public_html/.env')
-    ? report('fail', '.env is outside the web root', 'found public_html/.env - your secrets are downloadable')
-    : report('ok', '.env is outside the web root');
+    str_contains((string) file_get_contents($htaccess), 'Require all denied')
+        ? report('ok', "{$dir}/.htaccess denies access")
+        : report('fail', "{$dir}/.htaccess denies access", 'file exists but has no deny directive');
+}
 
-// Only index.php should be executable PHP inside public_html.
+// .env itself is checked properly in the Configuration section below
+// (existence, permissions); it belongs at this same level, alongside
+// index.php, not inside a separate public_html/.
+
+// Only index.php should be executable PHP at the root - anything else
+// there is either a leftover installer or a misplaced upload.
 $strayPhp = array_values(array_filter(
-    glob($root . '/public_html/*.php') ?: [],
+    glob($root . '/*.php') ?: [],
     static fn (string $p): bool => basename($p) !== 'index.php'
 ));
 $strayPhp === []
-    ? report('ok', 'no stray .php in public_html')
-    : report('warn', 'no stray .php in public_html', implode(', ', array_map('basename', $strayPhp)));
+    ? report('ok', 'no stray .php at the root')
+    : report('warn', 'no stray .php at the root', implode(', ', array_map('basename', $strayPhp)));
 
 //---------------------------------------------------------------------
 section('Compiled assets');
@@ -131,13 +141,13 @@ foreach ([
     'assets/js/app.js'        => 'interface script',
     'assets/js/qrcode.min.js' => 'QR renderer',
 ] as $path => $label) {
-    $full = $root . '/public_html/' . $path;
+    $full = $root . '/' . $path;
     is_file($full) && filesize($full) > 0
         ? report('ok', $label, number_format(filesize($full) / 1024, 1) . ' kB')
         : report('fail', $label, "{$path} missing - run: npm run build");
 }
 
-$fonts = glob($root . '/public_html/assets/fonts/*.woff2') ?: [];
+$fonts = glob($root . '/assets/fonts/*.woff2') ?: [];
 count($fonts) >= 7
     ? report('ok', 'self-hosted fonts', count($fonts) . ' files')
     : report('warn', 'self-hosted fonts', count($fonts) . ' of 7 - run: npm run fonts');

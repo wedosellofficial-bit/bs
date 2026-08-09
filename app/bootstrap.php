@@ -3,10 +3,11 @@
 declare(strict_types=1);
 
 /**
- * Application bootstrap. Loaded by public_html/index.php and by the CLI
- * scripts in bin/. Sets up the autoloader, configuration, error
- * handling, and nothing else - no output, no session, no database
- * connection. Those are started on demand.
+ * Application bootstrap. Loaded by the front controller (index.php, a
+ * sibling of this file's parent directory) and by the CLI scripts in
+ * bin/. Sets up the autoloader, configuration, error handling, and
+ * nothing else - no output, no session, no database connection. Those
+ * are started on demand.
  */
 
 use App\Lib\Config;

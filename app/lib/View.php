@@ -109,8 +109,10 @@ final class View
     }
 
     /**
-     * URL for NFT media. Always routed through the PHP handler - the files
-     * live outside the web root.
+     * URL for NFT media. Always routed through the PHP handler, never a
+     * direct link into storage/ - a direct request there is refused by
+     * storage/.htaccess anyway, but the handler is also where filename
+     * validation and unreleased-inventory access checks happen.
      */
     public static function media(?string $storedPath, string $variant = 'preview'): string
     {

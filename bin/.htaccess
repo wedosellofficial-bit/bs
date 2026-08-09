@@ -1,0 +1,15 @@
+# Billions Store - bin/.htaccess
+#
+# CLI entry points: migrate.php, cron.php, seed.php, reconcile.php,
+# doctor.php, test.php. Some of these take no auth at all when run from a
+# shell, on the assumption that only someone with shell access can invoke
+# them - bin/seed.php in particular would happily create a known admin
+# account if it could be reached over HTTP. None of them may ever be
+# requested as a URL.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

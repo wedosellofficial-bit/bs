@@ -3,7 +3,7 @@
 .env.local
 .env.*.local
 
-# Build tooling only. The *output* (public_html/assets) IS committed, because
+# Build tooling only. The *output* (assets/) IS committed, because
 # Hostinger cannot run npm.
 /node_modules/
 
