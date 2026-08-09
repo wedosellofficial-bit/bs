@@ -62,8 +62,24 @@ $readEnvFile = static function (string $path): array {
 
 $env = $readEnvFile($root . '/.env');
 
-/** Fetch an env value with a typed fallback. */
+/**
+ * Fetch a config value with a typed fallback.
+ *
+ * Precedence: a real process environment variable, then the `.env` file,
+ * then the default. The first matters on hosts whose deploy tooling sets
+ * environment variables through a panel rather than writing a physical
+ * `.env` file - Hostinger's "deploy from GitHub" product among them. Those
+ * variables survive a redeploy that wipes the filesystem, where a `.env`
+ * file (which is deliberately never committed) would not. A manual upload
+ * with a real `.env` file keeps working exactly as before; this only adds
+ * a second place to look, checked first.
+ */
 $get = static function (string $key, string $default = '') use ($env): string {
+    $fromEnv = getenv($key);
+    if ($fromEnv !== false && $fromEnv !== '') {
+        return $fromEnv;
+    }
+
     $v = $env[$key] ?? '';
 
     return $v === '' ? $default : $v;
