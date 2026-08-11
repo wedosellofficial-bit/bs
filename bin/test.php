@@ -21,6 +21,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../app/bootstrap.php';
 
+use App\AccountActivation;
 use App\Database;
 use App\Lib\Base58Check;
 use App\Lib\Bech32;
@@ -458,6 +459,80 @@ if (Database::isAvailable()) {
             $t->throws(
                 static fn () => ProductOrders::purchase($nonMemberUserId, $lockedProductId, false),
                 'a non-member cannot buy a members-only product'
+            );
+
+            // --- account activation: pending -> active at the threshold,
+            //     checkout gate, and the deposit staying fully spendable
+            // -------------------------------------------------------------
+            $threshold = AccountActivation::minActivationMinor();
+
+            Database::run(
+                "INSERT INTO users (email, password_hash, role, status, created_at)
+                 VALUES (?, 'x', 'user', 'active', UTC_TIMESTAMP())",
+                ["pending-{$suffix}@example.invalid"]
+            );
+            $pendingUserId = Database::lastInsertId();
+
+            $fresh = Database::first('SELECT account_status FROM users WHERE id = ?', [$pendingUserId]);
+            $t->same((string) $fresh['account_status'], 'pending', 'a new registration starts pending');
+
+            // Fund to just short of the threshold - must stay pending.
+            if ($threshold > 100) {
+                Wallet::withUserLock($pendingUserId, static function () use ($pendingUserId, $threshold): void {
+                    Wallet::credit($pendingUserId, $threshold - 100, Wallet::TYPE_DEPOSIT, 'manual', $pendingUserId, 'test fixture: below threshold');
+                });
+                $stillPending = Database::first('SELECT account_status FROM users WHERE id = ?', [$pendingUserId]);
+                $t->same((string) $stillPending['account_status'], 'pending', 'a deposit below the threshold does not activate the account');
+            }
+
+            // A pending account cannot check out (the real gate this
+            // whole feature exists for).
+            try {
+                ProductOrders::purchase($pendingUserId, $discountProductId, false);
+                $t->ok(false, 'a pending account cannot check out');
+            } catch (RuntimeException $e) {
+                $t->ok(
+                    str_contains($e->getMessage(), 'Fund your account')
+                        && str_contains($e->getMessage(), Fmt::money($threshold)),
+                    'a pending account gets a clear fund-your-account prompt naming the threshold, not a generic error'
+                );
+            }
+
+            // Cross the threshold - must activate automatically, with no
+            // separate ledger entry beyond the deposits actually made
+            // (i.e. activation itself never writes a wallet_entries row).
+            $entriesBeforeCrossing = (int) Database::scalar(
+                'SELECT COUNT(*) FROM wallet_entries WHERE user_id = ?',
+                [$pendingUserId],
+                0
+            );
+
+            Wallet::withUserLock($pendingUserId, static function () use ($pendingUserId): void {
+                Wallet::credit($pendingUserId, 100, Wallet::TYPE_DEPOSIT, 'manual', $pendingUserId + 1_000_000, 'test fixture: crosses threshold');
+            });
+
+            $nowActive = Database::first('SELECT account_status FROM users WHERE id = ?', [$pendingUserId]);
+            $t->same((string) $nowActive['account_status'], 'active', 'a deposit that reaches the threshold activates the account automatically');
+
+            $entriesAfterCrossing = (int) Database::scalar(
+                'SELECT COUNT(*) FROM wallet_entries WHERE user_id = ?',
+                [$pendingUserId],
+                0
+            );
+            $t->same($entriesAfterCrossing, $entriesBeforeCrossing + 1, 'activation writes no ledger entry of its own - only the deposits already made');
+
+            // The activation deposit is ordinary, fully spendable balance:
+            // spend it on a real purchase and confirm the debit works
+            // exactly like any other purchase, for the exact amount.
+            $balanceAtThreshold = Wallet::balance($pendingUserId);
+            $t->same($balanceAtThreshold, $threshold, 'the full deposit is present as spendable balance, none of it withheld as a fee');
+
+            $spendResult = ProductOrders::purchase($pendingUserId, $discountProductId, false);
+            $t->same($spendResult['price_minor'], 2000, 'the now-active account can check out');
+            $t->same(
+                Wallet::balance($pendingUserId),
+                $balanceAtThreshold - 2000,
+                'spending the activation deposit debits the ledger by exactly the price - it was never partially consumed by activation'
             );
 
             // --- purchase -> download-access grant ---------------------

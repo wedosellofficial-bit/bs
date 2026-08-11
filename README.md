@@ -17,7 +17,9 @@ no build step on the server, no long-running processes.
 | **Payment** | Site balance, topped up in BTC |
 | **Provider** | Manual — one operator-held address, credited by hand (Coinbase Commerce built in but disabled) |
 | **Transfer mode** | Manual — admin queue, no signing key on the server |
-| **Membership** | `MEMBERSHIP_GATE=all` (default) — full paywall, nothing browsable without joining |
+| **Catalog access** | Open — anyone, signed in or not, can browse everything |
+| **Account activation** | A new account is `pending` until its wallet reaches `ACCOUNT_MIN_ACTIVATION_MINOR` (default $50) — an ordinary, fully spendable deposit, not a fee. `pending` can browse, not check out |
+| **Membership** | `MEMBERSHIP_GATE=off` (default) — an optional upgrade (member pricing, members-only collections), not an access gate |
 
 ---
 
@@ -51,16 +53,30 @@ cannot move a single inscription, because this host cannot sign. That is
 the whole security argument for starting manual — automate later behind a
 spending cap and an address allowlist, not before.
 
-**4. Membership defaults to a full paywall — `MEMBERSHIP_GATE=all`.**
-Every route except the ones needed to become a member (auth, the
-membership page itself, wallet funding, account self-service, legal
-pages) redirects a non-member to `/membership`. This is a deliberate
-operator choice, not a technical default — the same code also supports
-`purchase` (browse freely, pay to buy) and `off` (membership is a pure
-optional upgrade) via the same config key. See
-`App\Lib\Router::membershipGateApplies()` for the exact exempt list, and
-`Auth::requireMembership()` for the guard itself. Admins always bypass
-the gate, or an admin account could lock itself out.
+**4. The catalog is open; checkout is gated by account activation, not
+membership.** Anyone, signed in or not, can browse the shop, collections,
+and every product/inscription page - `MEMBERSHIP_GATE=off` by default,
+so membership gates nothing on its own. What gates checkout is a
+*separate* axis, `App\AccountActivation`: a new registration is
+`pending` until its wallet balance reaches `ACCOUNT_MIN_ACTIVATION_MINOR`
+(default $50), at which point it becomes `active` automatically - the
+moment any wallet credit brings the balance to that minimum
+(`AccountActivation::maybeActivate()`, called from `Wallet::credit()`,
+the one choke point every credit passes through). This is an ordinary,
+fully spendable deposit. It is never converted into a fee, never
+partially withheld, and shows on the customer's statement exactly like
+any other credit - there is no code path here that turns activation into
+a charge, and if you ever find one, that is a bug. `REQUIRE_ACTIVATION_TO_PURCHASE`
+(default true) is what actually enforces the block, re-checked inside
+the same row lock as the purchase itself in both `Orders::purchase()` and
+`ProductOrders::purchase()`, not trusted from an earlier page load.
+
+**5. Membership (`App\Membership`) is a separate, optional upgrade layered
+on top of activation, not a second gate by default.** It buys member
+pricing on products that offer it and access to categories flagged
+members-only. `MEMBERSHIP_GATE` can still turn membership itself into a
+further gate (`purchase` or `all`) if an operator wants that later, but
+that is not this store's default - see `Membership::gateMode()`.
 
 ---
 
@@ -85,7 +101,8 @@ the gate, or an admin account could lock itself out.
 │   ├── Ordinals.php        taproot payout policy, inscription ids, explorers
 │   ├── Product.php         digital-art product catalog, search/filter, categories, tags
 │   ├── ProductOrders.php   the purchase transaction (products) + download tokens
-│   ├── Membership.php      Billions Membership: fee, gate mode, perk checks
+│   ├── Membership.php      Billions Membership: fee, gate mode, perk checks (optional upgrade)
+│   ├── AccountActivation.php  pending -> active at the deposit threshold (the real checkout gate)
 │   ├── lib/                Bech32, Base58Check, Totp, RateLimiter, Mailer,
 │   │                       ImageStore, DeliverableStore, Router, View, Logger, Config, ...
 │   ├── controllers/
@@ -481,17 +498,37 @@ This is the other catalog — no chain, no transfer queue, instant delivery.
    `DownloadController`); the link itself is never reusable, so it is safe
    even if it ends up in a browser history or a support screenshot.
 
+### Activating an account
+
+A new registration is `pending`. Because deposits are manual BTC, in
+practice that means: the customer sends BTC to the store address, tells
+you (or you notice it on **Admin → Users**), and you credit it through
+the usual **Manual adjustment** form - exactly as for any other deposit,
+no separate step. The moment that credit brings their balance to
+`ACCOUNT_MIN_ACTIVATION_MINOR`, the account flips to `active`
+automatically; you never have to remember a second toggle. Their
+pending/active status and a manual override (for the rare exception -
+activating someone early, or the reverse) are both on their user page.
+
+The deposit that activates the account is never anything other than
+ordinary balance. It shows on their statement, it is fully spendable,
+and there is no "activation fee" line anywhere in the ledger - only the
+deposit itself, and later, whatever they choose to spend it on.
+
 ### Managing membership
 
-Billions Membership is a one-time fee (`MEMBERSHIP_FEE_MINOR`, default
-$50.00) that flips `users.is_member` and unlocks member pricing and
-members-only categories. It is paid through `Wallet::debit()` like any
-purchase, so it appears on the member's statement.
+Billions Membership is a *separate, optional* one-time fee
+(`MEMBERSHIP_FEE_MINOR`, default $50.00) that flips `users.is_member` and
+unlocks member pricing and members-only categories. It is paid through
+`Wallet::debit()` like any purchase, so it appears on the member's
+statement. It has nothing to do with account activation above - a
+standard, non-member, *active* account can already buy everything that
+is not flagged members-only.
 
-What membership *gates*, beyond those perks, is controlled separately by
-`MEMBERSHIP_GATE` (see point 4 in the intro above) — changing the perks
-and changing the paywall are two different settings on purpose, so
-loosening the paywall later doesn't also have to touch pricing.
+Membership can additionally act as a gate of its own, on top of
+activation, via `MEMBERSHIP_GATE` (see points 4 and 5 in the intro
+above) - `off` by default, meaning it doesn't. Changing the perks and
+changing what membership gates are two different settings on purpose.
 
 ### Crediting a deposit
 
@@ -581,11 +618,21 @@ Beyond the three points at the top:
   not a webhook signature - the endpoint that used HMAC signing is
   currently unrouted, see above). A per-controller check eventually gets
   forgotten on exactly one form.
-- **Membership gate** — enforced in the router (`Auth::requireMembership()`,
-  called from `Router::dispatch()`), the same layer CSRF is enforced in
-  and for the same reason: a per-controller check is a check a new
-  controller can forget to add. Admins bypass it unconditionally, so an
-  admin account can never lock itself out of its own panel.
+- **Membership gate** — off by default; when enabled, enforced in the
+  router (`Auth::requireMembership()`, called from `Router::dispatch()`),
+  the same layer CSRF is enforced in and for the same reason: a
+  per-controller check is a check a new controller can forget to add.
+  Admins bypass it unconditionally, so an admin account can never lock
+  itself out of its own panel.
+- **Account activation** — the real checkout gate, and deliberately not
+  enforced in the router: browsing must stay open regardless of it, so
+  it is instead re-checked inside `Orders::purchase()` and
+  `ProductOrders::purchase()`, inside the same row lock as the purchase
+  itself. `AccountActivation::maybeActivate()` - the only code path that
+  writes `account_status` - never touches `wallet_entries`; it only ever
+  reads the balance that `Wallet::credit()` already wrote and flips a
+  status flag, which is what keeps the activation deposit from ever being
+  anything other than ordinary, fully spendable balance.
 - **Payout addresses** — full bech32m checksum validation, taproot only.
   A legacy or bc1q address is rejected with an error that says what to use
   instead, because "invalid address" reads like a typo and invites a
@@ -626,10 +673,15 @@ Beyond the three points at the top:
   AJAX-fragment pattern the NFT collection browser uses - every filter
   change is a full page load. It works with JavaScript off and needed no
   client-side wiring; it is simply slower to use than the NFT browser.
-- **`MEMBERSHIP_GATE=all` means a logged-out visitor sees nothing of the
-  catalog** - not even the home page. That is the operator's explicit
-  choice for this store (see point 4 in the intro), not a limitation;
-  loosen it to `purchase` or `off` if a public storefront is wanted later.
+- **A `pending` account can still see everything a member can, minus the
+  ability to check out.** There is no "preview mode" that hides prices or
+  detail pages from an unfunded account - deliberately, since the whole
+  point of this model is that browsing costs nothing.
+- **Raising `ACCOUNT_MIN_ACTIVATION_MINOR` does not retroactively demote
+  already-active accounts.** Activation is one-directional and checked
+  only at credit time (see `AccountActivation::maybeActivate()`); an
+  account that activated under an old, lower threshold stays active if
+  the threshold is later raised.
 - **`/preorder` is a placeholder page.** Nothing in this build takes a
   preorder deposit for an unreleased item - build that separately if it's
   needed; the nav item exists so the link isn't dead.

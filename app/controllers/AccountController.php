@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\AccountActivation;
 use App\Auth;
 use App\Database;
 use App\Lib\Config;
@@ -31,6 +32,8 @@ final class AccountController extends Controller
             'productOrders' => ProductOrders::forUser($userId, 5),
             'statement'  => Wallet::statement($userId, 5),
             'isMember'   => Membership::isMember($user),
+            'isActive'   => AccountActivation::isActive($user),
+            'minActivationMinor' => AccountActivation::minActivationMinor(),
             'announcements' => Database::all(
                 'SELECT title, body, level, published_at FROM announcements
                   WHERE published_at IS NOT NULL AND published_at <= UTC_TIMESTAMP()

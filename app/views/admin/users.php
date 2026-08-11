@@ -24,6 +24,7 @@ use App\Lib\Fmt;
                 <th scope="col">User</th>
                 <th scope="col">Balance</th>
                 <th scope="col">Status</th>
+                <th scope="col">Activation</th>
                 <th scope="col">2FA</th>
                 <th scope="col">Joined</th>
                 <th scope="col">Last seen</th>
@@ -48,6 +49,11 @@ use App\Lib\Fmt;
                     <td>
                         <span class="badge <?= $user['status'] === 'active' ? 'badge-ok' : 'badge-failed' ?>">
                             <?= Fmt::e((string) $user['status']) ?>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge <?= $user['account_status'] === 'active' ? 'badge-ok' : 'badge-pending' ?>">
+                            <?= Fmt::e((string) $user['account_status']) ?>
                         </span>
                     </td>
                     <td class="text-ink-400"><?= $user['twofa_confirmed_at'] !== null ? 'on' : Fmt::e(Fmt::EM_DASH) ?></td>

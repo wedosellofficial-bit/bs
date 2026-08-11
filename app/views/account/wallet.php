@@ -17,12 +17,31 @@ declare(strict_types=1);
  * @var array{credits:int,debits:int,entries:int} $totals
  * @var list<array<string,mixed>> $statement
  * @var string $depositAddress
+ * @var bool $isActive
+ * @var int $minActivationMinor
  */
 
 use App\Lib\Fmt;
 ?>
 
 <div class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+
+    <?php if (!$isActive): ?>
+        <div class="flash flash-info mb-6">
+            <div>
+                <p class="font-medium">
+                    Your account is pending. Fund it with at least <?= Fmt::e(Fmt::money($minActivationMinor)) ?>
+                    to activate and start buying.
+                </p>
+                <p class="mt-1 text-sm">
+                    This is not a fee - the deposit becomes ordinary store balance, spendable on anything, and it
+                    activates your account the instant it is credited. You currently have
+                    <?= Fmt::e(Fmt::money($balance)) ?>; <?= Fmt::e(Fmt::money(max(0, $minActivationMinor - $balance))) ?>
+                    more to go.
+                </p>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <?php // ---------- Balance header ---------- ?>
     <header class="mb-8">

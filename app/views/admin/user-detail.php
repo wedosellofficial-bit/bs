@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use App\AccountActivation;
 use App\Auth;
 use App\Lib\Fmt;
 ?>
@@ -32,6 +33,27 @@ use App\Lib\Fmt;
             <select class="field w-auto text-sm" id="status" name="status">
                 <?php foreach (['active', 'suspended', 'closed'] as $option): ?>
                     <option value="<?= Fmt::e($option) ?>" <?= $user['status'] === $option ? 'selected' : '' ?>>
+                        <?= Fmt::e($option) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <button class="btn btn-secondary btn-sm" type="submit">Update</button>
+        </form>
+    </section>
+
+    <section class="card p-5">
+        <h2 class="text-sm font-semibold text-ink-100">Activation</h2>
+        <p class="mt-1 text-xs text-ink-500">
+            Flips to active automatically once balance reaches
+            <?= Fmt::e(Fmt::money(AccountActivation::minActivationMinor())) ?> - the deposit stays ordinary,
+            spendable balance. This override is for the exceptions.
+        </p>
+        <form method="post" action="/admin/users/<?= (int) $user['id'] ?>/account-status" class="mt-3 flex flex-wrap gap-2">
+            <?= Auth::csrfField() ?>
+            <label class="sr-only-focusable" for="account_status">Activation</label>
+            <select class="field w-auto text-sm" id="account_status" name="account_status">
+                <?php foreach (['pending', 'active'] as $option): ?>
+                    <option value="<?= Fmt::e($option) ?>" <?= $user['account_status'] === $option ? 'selected' : '' ?>>
                         <?= Fmt::e($option) ?>
                     </option>
                 <?php endforeach; ?>

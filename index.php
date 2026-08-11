@@ -171,6 +171,7 @@ $router->get('/admin', [AdminHomeController::class, 'dashboard']);
 $router->get('/admin/users', [AdminUserController::class, 'index']);
 $router->get('/admin/users/{id}', [AdminUserController::class, 'show']);
 $router->post('/admin/users/{id}/status', [AdminUserController::class, 'updateStatus']);
+$router->post('/admin/users/{id}/account-status', [AdminUserController::class, 'updateAccountStatus']);
 $router->post('/admin/users/{id}/credit', [AdminUserController::class, 'manualCredit']);
 
 $router->get('/admin/inventory', [AdminInventoryController::class, 'index']);

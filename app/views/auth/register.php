@@ -1,13 +1,22 @@
 <?php
 declare(strict_types=1);
+use App\AccountActivation;
 use App\Auth;
 use App\Lib\Fmt;
 $old = $old ?? [];
+$minActivation = AccountActivation::minActivationMinor();
 ?>
 <div class="card p-7">
     <h1 class="font-display text-3xl text-ink-100">Create an account</h1>
     <p class="mt-1 text-sm text-ink-400">
         You will need a confirmed email address before you can add funds or buy.
+    </p>
+
+    <p class="mt-3 rounded-lg border border-ink-800 bg-ink-900 p-3 text-sm text-ink-300">
+        Browsing is free and open to everyone. To buy, fund your account with at least
+        <span class="price text-ink-100"><?= Fmt::e(Fmt::money($minActivation)) ?></span> in BTC - this is not a
+        fee: it becomes your ordinary store balance, spendable on anything, and appears on your statement like
+        any other deposit.
     </p>
 
     <form method="post" action="/register" class="mt-6 space-y-4">

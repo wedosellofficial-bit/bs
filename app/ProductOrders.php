@@ -41,6 +41,16 @@ final class ProductOrders
     public static function purchase(int $userId, int $productId, bool $isMember): array
     {
         return Wallet::withUserLock($userId, static function (int $balanceBefore) use ($userId, $productId, $isMember): array {
+            // Activation gate: a pending account cannot check out. This
+            // is a different axis from the members-only check below -
+            // see App\AccountActivation's class docblock.
+            if (AccountActivation::requiredToPurchase()) {
+                $buyer = Database::first('SELECT account_status FROM users WHERE id = ?', [$userId]);
+                if (!AccountActivation::isActive($buyer)) {
+                    throw new RuntimeException(AccountActivation::activationPrompt($balanceBefore));
+                }
+            }
+
             $product = Database::first(
                 'SELECT p.id, p.name, p.status, p.price_minor, p.member_price_minor, p.deliverable_path,
                         c.is_members_only AS category_is_members_only

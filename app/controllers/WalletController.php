@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\AccountActivation;
 use App\Auth;
 use App\Lib\Config;
 use App\Lib\Request;
@@ -38,6 +39,7 @@ final class WalletController extends Controller
         $userId = (int) $user['id'];
 
         $address = Config::string('manual_deposit.btc_address');
+        $balance = Wallet::balance($userId);
 
         $this->view('account/wallet', [
             'title'      => 'Wallet',
@@ -45,10 +47,12 @@ final class WalletController extends Controller
             // never goes anywhere but this page and the wallet software
             // that reads it - no third-party QR image service.
             'needsQr'    => $address !== '',
-            'balance'    => Wallet::balance($userId),
+            'balance'    => $balance,
             'totals'     => Wallet::totals($userId),
             'statement'  => Wallet::statement($userId, 8),
             'depositAddress' => $address,
+            'isActive'   => AccountActivation::isActive($user),
+            'minActivationMinor' => AccountActivation::minActivationMinor(),
         ]);
     }
 

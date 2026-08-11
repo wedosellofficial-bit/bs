@@ -8,6 +8,8 @@ declare(strict_types=1);
  * @var list<array<string,mixed>> $productOrders
  * @var list<array<string,mixed>> $statement
  * @var bool $isMember
+ * @var bool $isActive
+ * @var int $minActivationMinor
  * @var list<array<string,mixed>> $announcements
  */
 
@@ -17,6 +19,19 @@ use App\Lib\View;
 <div class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
     <h1 class="font-display text-4xl text-ink-100">Dashboard</h1>
+
+    <?php if (!$isActive): ?>
+        <div class="mt-6 flash flash-info">
+            <div>
+                <p class="font-medium">
+                    Your account is pending. Fund your wallet with at least
+                    <?= Fmt::e(Fmt::money($minActivationMinor)) ?> to activate it and start buying - browsing
+                    stays free either way.
+                </p>
+                <a href="/account/wallet" class="mt-1 inline-block text-sm underline">Add funds</a>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <?php foreach ($announcements as $announcement): ?>
         <div class="mt-6 card p-4 <?= $announcement['level'] === 'critical' ? 'border-rose-600' : ($announcement['level'] === 'warning' ? 'border-amber-400/40' : '') ?>">

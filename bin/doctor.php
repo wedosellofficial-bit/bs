@@ -197,6 +197,7 @@ require $root . '/app/bootstrap.php';
 
 use App\Database;
 use App\Lib\Config;
+use App\Lib\Fmt;
 use App\Lib\Migrator;
 use App\Ordinals;
 
@@ -252,16 +253,27 @@ Config::bool('chain.require_taproot', true)
     ? report('ok', 'Taproot payouts required', 'yes')
     : report('warn', 'Taproot payouts required', 'DISABLED - inscriptions can be sent to wallets that lose them');
 
-// Membership gate mode. 'all' is a full paywall (this store's chosen
-// default) - worth a loud confirmation, not a silent pass, since it is
-// the difference between an open storefront and a closed one.
-$gate = Config::string('membership.gate', 'all');
+// Membership gate mode. 'off' (this store's default) means membership is
+// a pure optional upgrade - the account-activation gate below is what
+// actually controls checkout, not this.
+$gate = Config::string('membership.gate', 'off');
 match ($gate) {
-    'all'      => report('ok', 'MEMBERSHIP_GATE', 'all - full paywall, nothing browsable until membership'),
-    'purchase' => report('ok', 'MEMBERSHIP_GATE', 'purchase - browsing open, buying requires membership'),
-    'off'      => report('ok', 'MEMBERSHIP_GATE', 'off - membership is a pure optional upgrade'),
+    'off'      => report('ok', 'MEMBERSHIP_GATE', 'off - membership is a pure optional upgrade, gates nothing'),
+    'purchase' => report('ok', 'MEMBERSHIP_GATE', 'purchase - browsing open, buying also requires membership'),
+    'all'      => report('warn', 'MEMBERSHIP_GATE', 'all - full paywall on top of account activation; confirm that stacking is intended'),
     default    => report('warn', 'MEMBERSHIP_GATE', "unrecognised value '{$gate}' - Router falls back to 'all'"),
 };
+
+// Account activation - the actual checkout gate. The catalog itself is
+// always browsable regardless of this; only checkout is affected.
+$minActivation = Config::int('account.min_activation_minor', 5000);
+$minActivation > 0
+    ? report('ok', 'ACCOUNT_MIN_ACTIVATION_MINOR', Fmt::money($minActivation) . ' minimum deposit to activate')
+    : report('warn', 'ACCOUNT_MIN_ACTIVATION_MINOR', '0 - every new account is active immediately, no funding required');
+
+Config::bool('account.require_activation_to_purchase', true)
+    ? report('ok', 'REQUIRE_ACTIVATION_TO_PURCHASE', 'true - a pending account can browse but not check out')
+    : report('warn', 'REQUIRE_ACTIVATION_TO_PURCHASE', 'false - activation is informational only; anyone can buy while pending');
 
 //---------------------------------------------------------------------
 section('Database');
@@ -310,6 +322,10 @@ if (!Database::isAvailable()) {
 
         $listedProducts = (int) Database::scalar("SELECT COUNT(*) FROM products WHERE status = 'listed'", [], 0);
         report($listedProducts > 0 ? 'ok' : 'warn', 'listed products', (string) $listedProducts);
+
+        $pendingAccounts = (int) Database::scalar("SELECT COUNT(*) FROM users WHERE account_status = 'pending'", [], 0);
+        $activeAccounts = (int) Database::scalar("SELECT COUNT(*) FROM users WHERE account_status = 'active'", [], 0);
+        report('ok', 'account activation', "{$activeAccounts} active, {$pendingAccounts} pending");
 
         // A listed product with no deliverable would let a purchase
         // succeed and leave the buyer with nothing to download -

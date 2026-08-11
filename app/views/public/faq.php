@@ -1,9 +1,23 @@
 <?php
 declare(strict_types=1);
+use App\AccountActivation;
 use App\Lib\Config;
 use App\Lib\Fmt;
 
+$minActivation = AccountActivation::minActivationMinor();
+
 $faqs = [
+    [
+        'Do I have to pay to browse or create an account?',
+        sprintf(
+            'No. Browsing the catalog and registering are both free and open to everyone. Buying requires an '
+            . 'active account, which means funding your wallet with at least %s in BTC first. That deposit is '
+            . 'not a fee - it becomes ordinary store balance you can spend on anything, and it shows on your '
+            . 'statement exactly like any other deposit. Your account activates automatically the moment that '
+            . 'deposit is credited.',
+            Fmt::money($minActivation)
+        ),
+    ],
     ['How do I pay?', 'Send BTC to the deposit address shown on your wallet page. It is a single permanent address, the same one for every customer - not a fresh one generated per top-up.'],
     ['When is my deposit credited?', 'By hand, after an admin checks your transaction on a block explorer and confirms it has settled. This is not automatic, so it will not appear the moment your transaction confirms - allow up to a day, and contact support with your transaction id if it has been longer.'],
     ['What if I send the wrong amount?', 'Whatever amount arrives is what gets credited, converted at the rate on the day it is reviewed. There is no quote to over- or under-pay against - just send what you want to add.'],

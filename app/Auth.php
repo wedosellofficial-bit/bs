@@ -336,9 +336,9 @@ final class Auth
         $email = self::normalizeEmail($email);
 
         Database::run(
-            'INSERT INTO users (email, password_hash, display_name, role, status, created_at)
-             VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())',
-            [$email, self::hashPassword($password), $displayName, 'user', 'active']
+            'INSERT INTO users (email, password_hash, display_name, role, status, account_status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+            [$email, self::hashPassword($password), $displayName, 'user', 'active', \App\AccountActivation::STATUS_PENDING]
         );
 
         $userId = Database::lastInsertId();

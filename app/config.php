@@ -214,16 +214,28 @@ return [
         'admin_password' => $get('SEED_ADMIN_PASSWORD'),
     ],
 
-    // Billions Membership. `gate` controls what membership gates - see
-    // the comment on Membership::gateMode() - and defaults to 'all', a
-    // full paywall: nothing on the storefront is reachable until a
-    // visitor registers and pays the fee. 'purchase' loosens that to
-    // "browse freely, pay to buy"; 'off' makes membership a pure
-    // optional upgrade that gates nothing. Changing this is a config
-    // edit, not a code change.
+    // Billions Membership: an optional paid upgrade (member pricing,
+    // members-only collections), not the account gate - see
+    // 'account' below for that. `gate` controls whether membership
+    // ALSO restricts browsing/buying beyond that optional-upgrade role;
+    // see the comment on Membership::gateMode(). Defaults to 'off' - the
+    // catalog is open to browse and membership gates nothing by itself.
+    // 'purchase' and 'all' exist for an operator who wants membership
+    // itself to act as a further gate on top of account activation;
+    // changing this is a config edit, not a code change.
     'membership' => [
-        'gate'      => $get('MEMBERSHIP_GATE', 'all'),
+        'gate'      => $get('MEMBERSHIP_GATE', 'off'),
         'fee_minor' => $int('MEMBERSHIP_FEE_MINOR', 5000),
+    ],
+
+    // Account activation: a new registration is `pending` until its
+    // wallet balance reaches this minimum, then App\AccountActivation
+    // flips it to `active` automatically - see that class for why this
+    // is a real, spendable deposit and never a fee. `require_...` gates
+    // checkout only; browsing is always open regardless of this setting.
+    'account' => [
+        'min_activation_minor'          => $int('ACCOUNT_MIN_ACTIVATION_MINOR', 5000),
+        'require_activation_to_purchase' => $bool('REQUIRE_ACTIVATION_TO_PURCHASE', true),
     ],
 
     // Primary nav. Labels and hrefs live here rather than hardcoded in

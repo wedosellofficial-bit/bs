@@ -136,7 +136,17 @@ final class Wallet
             throw new InvalidArgumentException('credit() requires a positive amount; use debit() to subtract.');
         }
 
-        return self::append($userId, $amountMinor, $type, $referenceType, $referenceId, $memo, $createdBy);
+        $entryId = self::append($userId, $amountMinor, $type, $referenceType, $referenceId, $memo, $createdBy);
+
+        // "Check this at the point of every credit" - a credit is the
+        // only kind of ledger write that can carry a balance up across
+        // the activation threshold, so this is the one place that needs
+        // to ask. It only ever reads the balance and flips a status flag;
+        // see AccountActivation::maybeActivate() for why that is safe to
+        // call unconditionally here.
+        AccountActivation::maybeActivate($userId);
+
+        return $entryId;
     }
 
     /**

@@ -30,7 +30,7 @@ final class AdminUserController extends Controller
         }
 
         $users = Database::all(
-            "SELECT u.id, u.email, u.display_name, u.role, u.status,
+            "SELECT u.id, u.email, u.display_name, u.role, u.status, u.account_status,
                     u.email_verified_at, u.twofa_confirmed_at, u.created_at, u.last_login_at
                FROM users u
               WHERE {$where}
@@ -106,6 +106,45 @@ final class AdminUserController extends Controller
         Logger::audit('admin.user_status', "Account status set to {$status}", (int) $admin['id'], 'user', $userId);
 
         $this->back('/admin/users/' . $userId, 'success', "Account set to {$status}.");
+    }
+
+    /**
+     * Manual override of activation - pending/active. The automatic path
+     * (App\AccountActivation::maybeActivate(), called from every
+     * Wallet::credit()) already flips a pending account the instant a
+     * manual credit here brings it to the threshold, so this exists for
+     * the exceptions: activating someone early, or demoting an account
+     * back to pending for a reason unrelated to their balance.
+     */
+    public function updateAccountStatus(array $params): void
+    {
+        $admin = Auth::requireAdmin();
+        $userId = $this->id($params);
+        $accountStatus = Request::post('account_status');
+
+        if (!in_array($accountStatus, ['pending', 'active'], true)) {
+            $this->back('/admin/users/' . $userId, 'error', 'Unknown account status.');
+        }
+
+        $user = Database::first('SELECT id FROM users WHERE id = ?', [$userId]);
+        if ($user === null) {
+            $this->notFound('No such user.');
+        }
+
+        Database::run(
+            'UPDATE users SET account_status = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+            [$accountStatus, $userId]
+        );
+
+        Logger::audit(
+            'admin.account_activation_override',
+            "Account activation manually set to {$accountStatus}",
+            (int) $admin['id'],
+            'user',
+            $userId
+        );
+
+        $this->back('/admin/users/' . $userId, 'success', "Account activation set to {$accountStatus}.");
     }
 
     /**
