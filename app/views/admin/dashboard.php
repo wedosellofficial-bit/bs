@@ -28,6 +28,16 @@ use App\Lib\Fmt;
             Fmt::money((int) ($recentManualCredits['total_minor'] ?? 0)),
             number_format((int) ($recentManualCredits['count'] ?? 0)) . ' credited, ' . number_format($userCount) . ' users total',
         ],
+        [
+            'Product revenue',
+            Fmt::money((int) $productOrderStats['revenue_minor']),
+            number_format((int) $productOrderStats['total']) . ' digital-product orders',
+        ],
+        [
+            'Members',
+            number_format((int) $membershipStats['members']),
+            Fmt::money((int) $membershipStats['revenue_minor']) . ' in membership fees',
+        ],
     ];
     foreach ($tiles as [$label, $value, $sub]):
         ?>

@@ -19,12 +19,23 @@ final class MediaController extends Controller
 {
     public function show(array $params): void
     {
+        $this->serve($params, 'nft');
+    }
+
+    /** Product preview images - same pipeline, a separate storage subdirectory. */
+    public function showProduct(array $params): void
+    {
+        $this->serve($params, 'product');
+    }
+
+    private function serve(array $params, string $collection): void
+    {
         $variant = ($params['variant'] ?? '') === 'full' ? 'full' : 'preview';
         $file = (string) ($params['file'] ?? '');
 
         // absolutePath() enforces the generated-name pattern and strips any
         // directory component, so traversal cannot escape the media folder.
-        $path = ImageStore::absolutePath($file, $variant);
+        $path = ImageStore::absolutePath($file, $variant, $collection);
 
         if ($path === null) {
             http_response_code(404);

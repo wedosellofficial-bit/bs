@@ -10,8 +10,10 @@ use App\Lib\Config;
 use App\Lib\Logger;
 use App\Lib\Request;
 use App\Lib\Totp;
+use App\Membership;
 use App\Orders;
 use App\Ordinals;
+use App\ProductOrders;
 use App\Wallet;
 
 final class AccountController extends Controller
@@ -26,7 +28,9 @@ final class AccountController extends Controller
             'balance'    => Wallet::balance($userId),
             'orders'     => Orders::forUser($userId, 5),
             'owned'      => Orders::ownedByUser($userId),
+            'productOrders' => ProductOrders::forUser($userId, 5),
             'statement'  => Wallet::statement($userId, 5),
+            'isMember'   => Membership::isMember($user),
             'announcements' => Database::all(
                 'SELECT title, body, level, published_at FROM announcements
                   WHERE published_at IS NOT NULL AND published_at <= UTC_TIMESTAMP()
@@ -34,6 +38,46 @@ final class AccountController extends Controller
                   ORDER BY published_at DESC LIMIT 3'
             ),
         ]);
+    }
+
+    //-----------------------------------------------------------------
+    // Digital-product orders and downloads
+    //-----------------------------------------------------------------
+
+    public function productOrders(): void
+    {
+        $user = Auth::requireLogin();
+
+        $this->view('account/product-orders', [
+            'title'  => 'Orders',
+            'orders' => ProductOrders::forUser((int) $user['id'], 100),
+        ]);
+    }
+
+    /**
+     * Mint a fresh download token for an order the user owns, then
+     * redirect straight to it. A separate mint step (rather than
+     * downloading directly from this URL) is what makes the actual file
+     * URL single-use and short-lived - see DownloadController.
+     */
+    public function requestProductDownload(array $params): void
+    {
+        $user = Auth::requireLogin();
+        $orderId = $this->id($params);
+
+        $order = ProductOrders::find($orderId);
+
+        if ($order === null || (int) $order['user_id'] !== (int) $user['id']) {
+            $this->notFound('That order does not exist.');
+        }
+
+        if ($order['status'] !== 'paid') {
+            $this->back('/account/product-orders', 'error', 'That order is not in a downloadable state.');
+        }
+
+        $token = ProductOrders::issueDownloadToken($orderId, (int) $user['id']);
+
+        $this->redirect('/download/' . $token);
     }
 
     public function myNfts(): void

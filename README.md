@@ -1,8 +1,10 @@
 # Billions Store
 
-A custom PHP storefront for Bitcoin Ordinals inscriptions. Buyers top up a
-store balance with BTC and spend it on inscriptions the store holds; an
-admin transfers each one by hand from the project wallet.
+A custom PHP storefront selling two kinds of thing from one wallet ledger:
+Bitcoin Ordinals inscriptions (store-held, transferred by hand after
+purchase) and digital-art product files (instant download after purchase,
+no blockchain leg at all). Buyers top up a store balance with BTC and
+spend it on either.
 
 Built for shared hosting (Hostinger): plain PHP 8.2+, PDO, no framework,
 no build step on the server, no long-running processes.
@@ -10,10 +12,12 @@ no build step on the server, no long-running processes.
 | | |
 |---|---|
 | **Chain** | Bitcoin Ordinals (inscriptions on sats, no contract address) |
-| **Custody** | Store holds the inscriptions, transfers to buyer after purchase |
+| **Custody (NFTs)** | Store holds the inscriptions, transfers to buyer after purchase |
+| **Delivery (products)** | Instant authenticated download after purchase; no on-chain leg |
 | **Payment** | Site balance, topped up in BTC |
 | **Provider** | Manual — one operator-held address, credited by hand (Coinbase Commerce built in but disabled) |
 | **Transfer mode** | Manual — admin queue, no signing key on the server |
+| **Membership** | `MEMBERSHIP_GATE=all` (default) — full paywall, nothing browsable without joining |
 
 ---
 
@@ -47,6 +51,17 @@ cannot move a single inscription, because this host cannot sign. That is
 the whole security argument for starting manual — automate later behind a
 spending cap and an address allowlist, not before.
 
+**4. Membership defaults to a full paywall — `MEMBERSHIP_GATE=all`.**
+Every route except the ones needed to become a member (auth, the
+membership page itself, wallet funding, account self-service, legal
+pages) redirects a non-member to `/membership`. This is a deliberate
+operator choice, not a technical default — the same code also supports
+`purchase` (browse freely, pay to buy) and `off` (membership is a pure
+optional upgrade) via the same config key. See
+`App\Lib\Router::membershipGateApplies()` for the exact exempt list, and
+`Auth::requireMembership()` for the guard itself. Admins always bypass
+the gate, or an admin account could lock itself out.
+
 ---
 
 ## Layout
@@ -66,10 +81,13 @@ spending cap and an address allowlist, not before.
 │   ├── Wallet.php          the ledger
 │   ├── Payments.php        Coinbase Commerce charges + webhooks (disabled, see file header)
 │   ├── Nft.php             catalog, filters, transfer queue
-│   ├── Orders.php          the purchase transaction
+│   ├── Orders.php          the purchase transaction (Ordinals)
 │   ├── Ordinals.php        taproot payout policy, inscription ids, explorers
+│   ├── Product.php         digital-art product catalog, search/filter, categories, tags
+│   ├── ProductOrders.php   the purchase transaction (products) + download tokens
+│   ├── Membership.php      Billions Membership: fee, gate mode, perk checks
 │   ├── lib/                Bech32, Base58Check, Totp, RateLimiter, Mailer,
-│   │                       ImageStore, Router, View, Logger, Config, ...
+│   │                       ImageStore, DeliverableStore, Router, View, Logger, Config, ...
 │   ├── controllers/
 │   ├── views/
 │   └── migrations/
@@ -83,7 +101,10 @@ spending cap and an address allowlist, not before.
 │   ├── reconcile.php       ledger vs cache reconciliation
 │   └── test.php            self-tests, no dependencies
 │
-├── storage/               uploaded media, logs - NOT reachable
+├── storage/               uploaded media, deliverables, logs - NOT reachable
+│   ├── nft/, nft/preview/  NFT images (full / thumbnail)
+│   ├── product/, product/preview/  product preview images (full / thumbnail)
+│   ├── products/           product deliverable files - the thing buyers pay for
 │   └── .htaccess           Require all denied
 │
 ├── resources/             build sources (Tailwind input, font/JS copy scripts) - NOT reachable, not needed at runtime
@@ -436,6 +457,42 @@ If something goes wrong, **Report a problem** with a reason. The reason is
 shown to whoever picks it up next, and to the buyer on their order page.
 Refund from **Admin → Orders** if the buyer should get their money back.
 
+### Selling a digital-art product
+
+This is the other catalog — no chain, no transfer queue, instant delivery.
+
+1. **Admin → Products → Add product.** Name, price, and a preview image
+   (validated and re-encoded the same way as an NFT image). Optionally: a
+   member price (must be ≤ the standard price), a category, comma-separated
+   tags, and an inscription id — that field is display metadata only (see
+   the Generate button's own label in the form); it mints nothing and
+   gates nothing.
+2. Upload the **deliverable file** — the actual thing the buyer receives.
+   It is checked by magic bytes against an allowlist (image formats, PDF,
+   PSD, ZIP), stored outside the web root under a random name, and never
+   linked directly.
+3. Manage categories and tags from **Admin → Products → Categories & tags**.
+   Flag a category **members-only** to lock it to non-members with a
+   "join to access" prompt — the product still shows up in the catalog,
+   just not buyable.
+4. A buyer pays from their balance and gets a **Download** button on their
+   orders page immediately — no admin step. Each click mints a fresh,
+   single-use, 5-minute link (`App\ProductOrders::issueDownloadToken()` /
+   `DownloadController`); the link itself is never reusable, so it is safe
+   even if it ends up in a browser history or a support screenshot.
+
+### Managing membership
+
+Billions Membership is a one-time fee (`MEMBERSHIP_FEE_MINOR`, default
+$50.00) that flips `users.is_member` and unlocks member pricing and
+members-only categories. It is paid through `Wallet::debit()` like any
+purchase, so it appears on the member's statement.
+
+What membership *gates*, beyond those perks, is controlled separately by
+`MEMBERSHIP_GATE` (see point 4 in the intro above) — changing the perks
+and changing the paywall are two different settings on purpose, so
+loosening the paywall later doesn't also have to touch pricing.
+
 ### Crediting a deposit
 
 Every deposit needs a human — there is no automatic path. Once you can
@@ -504,20 +561,42 @@ Beyond the three points at the top:
   deliberately no unique constraint on `orders.nft_id` backing this up,
   because that would also forbid ever reselling a refunded item (see
   migration 006). Lock order is always user-then-item.
+- **Digital-product purchases** — no item-row race to close (a digital
+  good has unlimited supply, so there is nothing to oversell), but the
+  same-buyer race is closed the same way as an NFT purchase:
+  `Wallet::withUserLock()` serialises per buyer inside
+  `ProductOrders::purchase()`. Members-only gating is re-checked inside
+  that lock from the product's own category, not trusted from what the
+  caller passed in from an earlier page load.
+- **Downloads** — never a direct link into `storage/products/`. Every
+  download goes through a single-use, 5-minute token
+  (`download_tokens.token_hash`, hashed the same way as email-verification
+  tokens) minted only after the request already proves ownership of a
+  paid order; `DownloadController` re-checks that ownership, marks the
+  token spent, and streams the file in one request-scoped transaction, so
+  two simultaneous requests for the same link cannot both succeed.
 - **CSRF** — enforced in the router for every POST/PUT/PATCH/DELETE, with
-  an explicit exemption list holding only the one endpoint that has no
-  session (cron, authenticated by a bearer or query token, not a
-  webhook signature - the endpoint that used HMAC signing is currently
-  unrouted, see above). A per-controller check eventually gets forgotten
-  on exactly one form.
+  an explicit exemption list holding only the endpoints that have no
+  session (cron's two routes, authenticated by a bearer or query token,
+  not a webhook signature - the endpoint that used HMAC signing is
+  currently unrouted, see above). A per-controller check eventually gets
+  forgotten on exactly one form.
+- **Membership gate** — enforced in the router (`Auth::requireMembership()`,
+  called from `Router::dispatch()`), the same layer CSRF is enforced in
+  and for the same reason: a per-controller check is a check a new
+  controller can forget to add. Admins bypass it unconditionally, so an
+  admin account can never lock itself out of its own panel.
 - **Payout addresses** — full bech32m checksum validation, taproot only.
   A legacy or bc1q address is rejected with an error that says what to use
   instead, because "invalid address" reads like a typo and invites a
   second attempt at the same wrong thing.
 - **Passwords** — Argon2id, explicit cost parameters (64 MiB / 4 passes),
   transparent rehash on login when the parameters change.
-- **Uploads** — magic-byte type detection, GD re-encode, stored outside
-  the web root, served through a PHP handler. SVG is rejected outright.
+- **Uploads** — magic-byte type detection. NFT and product preview images
+  are GD re-encoded (strips metadata); product deliverable files cannot be
+  re-encoded without corrupting the art itself, so they are instead
+  checked against a strict format allowlist. Both land outside the web
+  root and are served through a PHP handler. SVG is rejected outright.
 - **Rate limits** — sliding window (row per attempt, not a resettable
   counter): login 5/15min per IP+email plus 30/15min per IP, registration,
   password reset, top-up address generation, purchases, 2FA codes.
@@ -543,3 +622,14 @@ Beyond the three points at the top:
   is that an unselected option shows its standalone count.
 - **`terms.php` and `privacy.php` are templates.** Have a lawyer in your
   jurisdiction review them before taking real money.
+- **The product shop (`/shop`) filters via a plain GET form**, not the
+  AJAX-fragment pattern the NFT collection browser uses - every filter
+  change is a full page load. It works with JavaScript off and needed no
+  client-side wiring; it is simply slower to use than the NFT browser.
+- **`MEMBERSHIP_GATE=all` means a logged-out visitor sees nothing of the
+  catalog** - not even the home page. That is the operator's explicit
+  choice for this store (see point 4 in the intro), not a limitation;
+  loosen it to `purchase` or `off` if a public storefront is wanted later.
+- **`/preorder` is a placeholder page.** Nothing in this build takes a
+  preorder deposit for an unreleased item - build that separately if it's
+  needed; the nav item exists so the link isn't dead.

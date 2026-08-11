@@ -36,6 +36,7 @@ final class RateLimiter
         // rate-limit budget, so it is tighter than the others.
         'topup_address'  => [6, 3600],
         'purchase'       => [20, 3600],
+        'membership_join' => [5, 3600],
         'twofa'          => [10, 900],
         'contact'        => [5, 3600],
     ];

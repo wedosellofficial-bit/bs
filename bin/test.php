@@ -21,11 +21,16 @@ declare(strict_types=1);
 
 require __DIR__ . '/../app/bootstrap.php';
 
+use App\Database;
 use App\Lib\Base58Check;
 use App\Lib\Bech32;
 use App\Lib\Fmt;
+use App\Membership;
 use App\Ordinals;
 use App\Payments;
+use App\Product;
+use App\ProductOrders;
+use App\Wallet;
 
 final class Tap
 {
@@ -329,5 +334,180 @@ $t->same(Payments::creditableMinor(10000, 100), 9900, '1% fee on $100.00 credits
 $t->same(Payments::creditableMinor(999, 100), 990, 'fee rounds in the store\'s favour, deterministically');
 $t->same(Payments::creditableMinor(1, 100), 1, 'a 1-cent deposit is never reduced to zero');
 $t->same(Payments::creditableMinor(0, 100), 0, 'a zero deposit credits zero');
+
+//---------------------------------------------------------------------
+// Digital-product catalog, membership gating, and the download grant.
+// These need a real database, unlike everything above - see the class
+// docblock. Every fixture row is written and read inside one
+// transaction that ends by throwing, so nothing here is ever actually
+// committed: re-running this suite never accumulates test data, and it
+// never touches whatever real catalog/users already exist.
+//---------------------------------------------------------------------
+if (Database::isAvailable()) {
+    $t->group('Digital-product catalog, membership gating, and downloads (rolled back after)');
+
+    try {
+        Database::transaction(function () use ($t): void {
+            $suffix = bin2hex(random_bytes(4));
+
+            Database::run(
+                'INSERT INTO product_categories (slug, name, is_members_only, is_visible, created_at)
+                 VALUES (?, ?, 0, 1, UTC_TIMESTAMP())',
+                ["open-{$suffix}", "Open {$suffix}"]
+            );
+            $openCatId = Database::lastInsertId();
+
+            Database::run(
+                'INSERT INTO product_categories (slug, name, is_members_only, is_visible, created_at)
+                 VALUES (?, ?, 1, 1, UTC_TIMESTAMP())',
+                ["locked-{$suffix}", "Locked {$suffix}"]
+            );
+            $lockedCatId = Database::lastInsertId();
+
+            // An open product with a member discount, and a members-only
+            // product at full price - between them these cover both perk
+            // types from §6 of the feature spec: member pricing and
+            // members-only collections.
+            Database::run(
+                'INSERT INTO products
+                    (slug, name, category_id, deliverable_path, price_minor, member_price_minor, status, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, \'listed\', UTC_TIMESTAMP())',
+                ["discount-{$suffix}", "Discount product {$suffix}", $openCatId, 'deadbeefdeadbeefdeadbeefdeadbeef.bin', 2000, 1500]
+            );
+            $discountProductId = Database::lastInsertId();
+            Product::syncTags($discountProductId, ['Abstract', 'Test Tag']);
+
+            Database::run(
+                'INSERT INTO products
+                    (slug, name, category_id, deliverable_path, price_minor, member_price_minor, status, created_at)
+                 VALUES (?, ?, ?, ?, ?, NULL, \'listed\', UTC_TIMESTAMP())',
+                ["locked-product-{$suffix}", "Locked product {$suffix}", $lockedCatId, 'beefdeadbeefdeadbeefdeadbeefdead.bin', 3000]
+            );
+            $lockedProductId = Database::lastInsertId();
+
+            // --- category / tag filtering -----------------------------
+            $bySlug = Product::findBySlug("discount-{$suffix}");
+            $t->ok($bySlug !== null && (int) $bySlug['id'] === $discountProductId, 'finds a product by slug');
+            $t->ok(count(Product::tagsFor($discountProductId)) === 2, 'syncTags attaches both tags');
+
+            $byCategory = Product::search(['category' => "open-{$suffix}"]);
+            $t->ok(
+                in_array($discountProductId, array_column($byCategory['items'], 'id'), true),
+                'category filter finds the product in that category'
+            );
+            $t->ok(
+                !in_array($lockedProductId, array_column($byCategory['items'], 'id'), true),
+                'category filter excludes products in a different category'
+            );
+
+            $byTag = Product::search(['tag' => Product::slugify('Test Tag')]);
+            $t->ok(
+                in_array($discountProductId, array_column($byTag['items'], 'id'), true),
+                'tag filter finds the product carrying that tag'
+            );
+
+            $byPriceTooLow = Product::search(['category' => "locked-{$suffix}", 'max_price' => 100]);
+            $t->ok(
+                !in_array($lockedProductId, array_column($byPriceTooLow['items'], 'id'), true),
+                'price filter excludes a product above the max'
+            );
+
+            // --- membership perk gating --------------------------------
+            $t->same(
+                Product::effectivePriceMinor($bySlug, false),
+                2000,
+                'non-members pay the standard price'
+            );
+            $t->same(
+                Product::effectivePriceMinor($bySlug, true),
+                1500,
+                'members pay the discounted member price'
+            );
+
+            // Two throwaway users, funded through the real ledger path
+            // (Wallet::withUserLock -> Wallet::credit), not a direct
+            // balance write.
+            Database::run(
+                "INSERT INTO users (email, password_hash, role, status, created_at)
+                 VALUES (?, 'x', 'user', 'active', UTC_TIMESTAMP())",
+                ["member-{$suffix}@example.invalid"]
+            );
+            $memberUserId = Database::lastInsertId();
+            Database::run(
+                "INSERT INTO users (email, password_hash, role, status, created_at)
+                 VALUES (?, 'x', 'user', 'active', UTC_TIMESTAMP())",
+                ["nonmember-{$suffix}@example.invalid"]
+            );
+            $nonMemberUserId = Database::lastInsertId();
+
+            foreach ([$memberUserId, $nonMemberUserId] as $userId) {
+                // reference_id must be unique per row under
+                // uniq_wallet_entries_ref (type, reference_type,
+                // reference_id) - it is not scoped by user_id, so reusing
+                // 0 for both fixture users collides.
+                Wallet::withUserLock($userId, static function () use ($userId): void {
+                    Wallet::credit($userId, 100000, Wallet::TYPE_DEPOSIT, 'manual', $userId, 'test fixture funding');
+                });
+            }
+
+            Membership::join($memberUserId);
+            $t->ok(Membership::isMember(['is_member' => 1]), 'isMember() reads the flag');
+            $t->ok(!Membership::isMember(['is_member' => 0]), 'isMember() is false for a standard account');
+            $t->ok(!Membership::isMember(null), 'isMember() is false for a guest');
+
+            $t->throws(
+                static fn () => ProductOrders::purchase($nonMemberUserId, $lockedProductId, false),
+                'a non-member cannot buy a members-only product'
+            );
+
+            // --- purchase -> download-access grant ---------------------
+            $t->ok(
+                !ProductOrders::ownsProduct($memberUserId, $discountProductId),
+                'ownsProduct() is false before any purchase'
+            );
+
+            $purchase = ProductOrders::purchase($memberUserId, $discountProductId, true);
+            $t->same($purchase['price_minor'], 1500, 'the member price is what actually gets charged');
+
+            $t->ok(
+                ProductOrders::ownsProduct($memberUserId, $discountProductId),
+                'purchasing grants ownership for the download gate'
+            );
+
+            $lockedPurchase = ProductOrders::purchase($memberUserId, $lockedProductId, true);
+            $t->ok($lockedPurchase['order_id'] > 0, 'a member can buy a members-only product');
+
+            $token = ProductOrders::issueDownloadToken($purchase['order_id'], $memberUserId);
+            $t->ok(preg_match('/^[0-9a-f]{64}$/', $token) === 1, 'the download token is a 64-hex string');
+
+            $consumed = ProductOrders::consumeDownloadToken($token);
+            $t->ok(
+                $consumed !== null
+                    && $consumed['product_order_id'] === $purchase['order_id']
+                    && $consumed['user_id'] === $memberUserId,
+                'a valid token resolves to the order and user it was issued for'
+            );
+
+            $t->ok(
+                ProductOrders::consumeDownloadToken($token) === null,
+                'the same token cannot be redeemed twice'
+            );
+
+            $t->ok(
+                ProductOrders::consumeDownloadToken('not-a-real-token') === null,
+                'a malformed token is rejected without a database lookup'
+            );
+
+            // Roll back everything this test wrote - see the group comment.
+            throw new RuntimeException('__test_fixtures_rollback__');
+        });
+    } catch (RuntimeException $e) {
+        if ($e->getMessage() !== '__test_fixtures_rollback__') {
+            throw $e;
+        }
+    }
+} else {
+    echo "\n# Digital-product catalog, membership gating, and downloads - skipped (no database configured)\n";
+}
 
 $t->finish();

@@ -91,4 +91,35 @@ final class Response
         readfile($absolutePath);
         exit;
     }
+
+    /**
+     * Stream a purchased deliverable as an attachment.
+     *
+     * Unlike file(), this is not cached (Cache-Control: no-store) and is
+     * not shown inline - every request here came through a single-use
+     * download token that is already spent by the time this runs, so
+     * there is nothing to gain from a browser or proxy keeping a copy,
+     * and a purchased file should prompt a save dialog, not open in the
+     * tab. $downloadName is the buyer-facing filename; it is quoted and
+     * has already had control characters and quotes stripped by
+     * DeliverableStore::safeOriginalName().
+     */
+    public static function download(string $absolutePath, string $mime, string $downloadName): never
+    {
+        if (!is_file($absolutePath)) {
+            http_response_code(404);
+            exit;
+        }
+
+        if (!headers_sent()) {
+            header('Content-Type: ' . $mime);
+            header('Content-Length: ' . (string) filesize($absolutePath));
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: no-store, private');
+            header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+        }
+
+        readfile($absolutePath);
+        exit;
+    }
 }

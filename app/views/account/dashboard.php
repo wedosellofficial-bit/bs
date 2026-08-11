@@ -5,7 +5,9 @@ declare(strict_types=1);
  * @var int $balance
  * @var list<array<string,mixed>> $orders
  * @var list<array<string,mixed>> $owned
+ * @var list<array<string,mixed>> $productOrders
  * @var list<array<string,mixed>> $statement
+ * @var bool $isMember
  * @var list<array<string,mixed>> $announcements
  */
 
@@ -23,7 +25,7 @@ use App\Lib\View;
         </div>
     <?php endforeach; ?>
 
-    <div class="mt-6 grid gap-4 sm:grid-cols-3">
+    <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <a href="/account/wallet" class="card p-5 transition-colors hover:border-ink-700">
             <p class="text-xs uppercase tracking-wider text-ink-500">Balance</p>
             <p class="price mt-1 text-3xl text-ink-100"><?= Fmt::e(Fmt::money($balance)) ?></p>
@@ -40,6 +42,18 @@ use App\Lib\View;
             <p class="text-xs uppercase tracking-wider text-ink-500">Orders</p>
             <p class="price mt-1 text-3xl text-ink-100"><?= count($orders) ?></p>
             <p class="mt-2 text-sm text-ember-500">Track them &rarr;</p>
+        </a>
+
+        <a href="/account/product-orders" class="card p-5 transition-colors hover:border-ink-700">
+            <p class="text-xs uppercase tracking-wider text-ink-500">Downloads</p>
+            <p class="price mt-1 text-3xl text-ink-100"><?= count($productOrders) ?></p>
+            <p class="mt-2 text-sm text-ember-500">View orders &rarr;</p>
+        </a>
+
+        <a href="/membership" class="card p-5 transition-colors hover:border-ink-700">
+            <p class="text-xs uppercase tracking-wider text-ink-500">Membership</p>
+            <p class="price mt-1 text-3xl text-ink-100"><?= $isMember ? 'Member' : 'Standard' ?></p>
+            <p class="mt-2 text-sm text-ember-500"><?= $isMember ? 'View perks' : 'Join' ?> &rarr;</p>
         </a>
     </div>
 

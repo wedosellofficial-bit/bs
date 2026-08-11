@@ -213,4 +213,30 @@ return [
         'admin_email'    => $get('SEED_ADMIN_EMAIL'),
         'admin_password' => $get('SEED_ADMIN_PASSWORD'),
     ],
+
+    // Billions Membership. `gate` controls what membership gates - see
+    // the comment on Membership::gateMode() - and defaults to 'all', a
+    // full paywall: nothing on the storefront is reachable until a
+    // visitor registers and pays the fee. 'purchase' loosens that to
+    // "browse freely, pay to buy"; 'off' makes membership a pure
+    // optional upgrade that gates nothing. Changing this is a config
+    // edit, not a code change.
+    'membership' => [
+        'gate'      => $get('MEMBERSHIP_GATE', 'all'),
+        'fee_minor' => $int('MEMBERSHIP_FEE_MINOR', 5000),
+    ],
+
+    // Primary nav. Labels and hrefs live here rather than hardcoded in
+    // the header partial so an operator can relabel or reorder without
+    // touching a view - a lightweight stand-in for a full admin-editable
+    // menu, which is a larger feature than this store needs today.
+    // Gift cards are deliberately not in this list - ask before adding
+    // one; the store operator said they will add that themselves.
+    'nav' => [
+        ['href' => '/news',       'label' => $get('NAV_LABEL_NEWS', 'News')],
+        ['href' => '/preorder',   'label' => $get('NAV_LABEL_PREORDER', 'Preorder')],
+        ['href' => '/shop',       'label' => $get('NAV_LABEL_COLLECTIONS', 'Collections')],
+        ['href' => '/membership', 'label' => $get('NAV_LABEL_MEMBERSHIP', 'Membership')],
+        ['href' => '/support',    'label' => $get('NAV_LABEL_SUPPORT', 'Support')],
+    ],
 ];

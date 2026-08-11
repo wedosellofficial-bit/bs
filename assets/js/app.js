@@ -609,13 +609,42 @@
       const button = form.querySelector('button[type="submit"]');
       if (!button) return;
 
-      // The server is already safe against a double submit (the item is
-      // locked and orders.nft_id is unique). This is only to stop the
-      // second click looking like it did nothing.
+      // The server is already safe against a double submit - the item
+      // row is locked inside Orders::purchase()/ProductOrders::purchase()
+      // for the duration of the charge. This is only to stop the second
+      // click looking like it did nothing.
       window.setTimeout(() => {
         button.disabled = true;
         button.textContent = 'Processing…';
       }, 0);
     });
+  });
+
+  /* ==================================================================
+     Inscription id placeholder generator (admin product form)
+
+     Fills the paired input with a structurally valid but fake
+     <64-hex>i0 placeholder - see Ordinals::isValidInscriptionId(). This
+     never talks to a server and mints nothing on-chain; it just saves
+     typing a sample value while testing the form.
+     ================================================================== */
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-generate-inscription]');
+    if (!button) return;
+
+    event.preventDefault();
+
+    const targetId = button.getAttribute('data-generate-inscription');
+    const input = targetId ? document.getElementById(targetId) : null;
+    if (!input) return;
+
+    const bytes = new Uint8Array(32);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
+    input.value = `${hex}i0`;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
   });
 })();

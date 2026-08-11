@@ -28,16 +28,21 @@ use App\Controllers\Admin\AdminAnnouncementController;
 use App\Controllers\Admin\AdminHomeController;
 use App\Controllers\Admin\AdminInventoryController;
 use App\Controllers\Admin\AdminOrderController;
+use App\Controllers\Admin\AdminProductController;
+use App\Controllers\Admin\AdminProductOrderController;
 use App\Controllers\Admin\AdminTransferController;
 use App\Controllers\Admin\AdminUserController;
 use App\Controllers\AccountController;
 use App\Controllers\AuthController;
 use App\Controllers\CollectionController;
 use App\Controllers\CronController;
+use App\Controllers\DownloadController;
 use App\Controllers\HomeController;
 use App\Controllers\MediaController;
+use App\Controllers\MembershipController;
 use App\Controllers\OrderController;
 use App\Controllers\PageController;
+use App\Controllers\ProductController;
 use App\Controllers\WalletController;
 use App\Lib\Router;
 
@@ -56,9 +61,26 @@ $router->get('/about', [PageController::class, 'about']);
 $router->get('/faq', [PageController::class, 'faq']);
 $router->get('/terms', [PageController::class, 'terms']);
 $router->get('/privacy', [PageController::class, 'privacy']);
+$router->get('/news', [PageController::class, 'news']);
+$router->get('/preorder', [PageController::class, 'preorder']);
+$router->get('/support', [PageController::class, 'support']);
 
 // NFT media, streamed from outside the web root.
 $router->get('/media/{variant}/{file}', [MediaController::class, 'show']);
+$router->get('/media/product/{variant}/{file}', [MediaController::class, 'showProduct']);
+
+//---------------------------------------------------------------------
+// Digital-art product shop
+//---------------------------------------------------------------------
+$router->get('/shop', [ProductController::class, 'index']);
+$router->get('/products/{slug}', [ProductController::class, 'show']);
+$router->post('/products/{slug}/buy', [ProductController::class, 'buy']);
+
+//---------------------------------------------------------------------
+// Billions Membership
+//---------------------------------------------------------------------
+$router->get('/membership', [MembershipController::class, 'show']);
+$router->post('/membership/join', [MembershipController::class, 'join']);
 
 //---------------------------------------------------------------------
 // Authentication
@@ -97,6 +119,13 @@ $router->post('/account/settings/payout-address', [AccountController::class, 'up
 $router->get('/account/settings/2fa', [AccountController::class, 'showTwoFactorSetup']);
 $router->post('/account/settings/2fa/enable', [AccountController::class, 'enableTwoFactor']);
 $router->post('/account/settings/2fa/disable', [AccountController::class, 'disableTwoFactor']);
+
+//---------------------------------------------------------------------
+// Digital-product orders and downloads
+//---------------------------------------------------------------------
+$router->get('/account/product-orders', [AccountController::class, 'productOrders']);
+$router->post('/account/product-orders/{id}/download', [AccountController::class, 'requestProductDownload']);
+$router->get('/download/{token}', [DownloadController::class, 'show']);
 
 //---------------------------------------------------------------------
 // Wallet
@@ -168,6 +197,21 @@ $router->post('/admin/transfers/{id}/failed', [AdminTransferController::class, '
 // crediting is AdminUserController::manualCredit(), routed above under
 // Users; it is the same ledger-safe credit path for every reason a
 // balance changes, deposits included.
+
+$router->get('/admin/products', [AdminProductController::class, 'index']);
+$router->get('/admin/products/new', [AdminProductController::class, 'create']);
+$router->post('/admin/products', [AdminProductController::class, 'store']);
+$router->get('/admin/products/categories', [AdminProductController::class, 'categories']);
+$router->post('/admin/products/categories', [AdminProductController::class, 'storeCategory']);
+$router->post('/admin/products/categories/{id}/delete', [AdminProductController::class, 'destroyCategory']);
+$router->post('/admin/products/tags/{id}/delete', [AdminProductController::class, 'destroyTag']);
+$router->get('/admin/products/{id}', [AdminProductController::class, 'edit']);
+$router->post('/admin/products/{id}', [AdminProductController::class, 'update']);
+$router->post('/admin/products/{id}/delete', [AdminProductController::class, 'destroy']);
+
+$router->get('/admin/product-orders', [AdminProductOrderController::class, 'index']);
+$router->get('/admin/product-orders/{id}', [AdminProductOrderController::class, 'show']);
+$router->post('/admin/product-orders/{id}/refund', [AdminProductOrderController::class, 'refund']);
 
 $router->get('/admin/announcements', [AdminAnnouncementController::class, 'index']);
 $router->post('/admin/announcements', [AdminAnnouncementController::class, 'store']);

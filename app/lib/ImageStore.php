@@ -55,10 +55,15 @@ final class ImageStore
     /**
      * Validate, re-encode and store an uploaded image.
      *
+     * $collection picks the storage subdirectory (and the matching one
+     * MediaController reads back from) - 'nft' for inventory images,
+     * 'product' for product preview images. Defaulting to 'nft' keeps
+     * every existing call site unchanged.
+     *
      * @param array{tmp_name:string,size:int,error:int,name:string} $file A $_FILES entry.
      * @return array{image_path:string,preview_path:string,mime:string,width:int,height:int}
      */
-    public static function storeUpload(array $file): array
+    public static function storeUpload(array $file, string $collection = 'nft'): array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             throw new RuntimeException(self::uploadErrorMessage((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE)));
@@ -76,7 +81,7 @@ final class ImageStore
             throw new RuntimeException('Images must be 16 MB or smaller.');
         }
 
-        return self::storeFromPath($tmp);
+        return self::storeFromPath($tmp, $collection);
     }
 
     /**
@@ -84,7 +89,7 @@ final class ImageStore
      *
      * @return array{image_path:string,preview_path:string,mime:string,width:int,height:int}
      */
-    public static function storeFromPath(string $path): array
+    public static function storeFromPath(string $path, string $collection = 'nft'): array
     {
         if (!is_readable($path)) {
             throw new RuntimeException('Image file is not readable.');
@@ -134,8 +139,8 @@ final class ImageStore
             $preview = self::resample($source, self::PREVIEW_MAX);
 
             try {
-                $imagePath = self::writeWebpOrJpeg($display, $baseName, 'nft');
-                $previewPath = self::writeWebpOrJpeg($preview, $baseName, 'nft/preview');
+                $imagePath = self::writeWebpOrJpeg($display, $baseName, $collection);
+                $previewPath = self::writeWebpOrJpeg($preview, $baseName, $collection . '/preview');
             } finally {
                 imagedestroy($display);
                 imagedestroy($preview);
@@ -260,15 +265,16 @@ final class ImageStore
      * `../../.env` resolves to `.env` inside the media directory and then
      * fails the is_file() check.
      */
-    public static function absolutePath(string $filename, string $variant = 'preview'): ?string
+    public static function absolutePath(string $filename, string $variant = 'preview', string $collection = 'nft'): ?string
     {
         $filename = basename($filename);
+        $collection = in_array($collection, ['nft', 'product'], true) ? $collection : 'nft';
 
         if (preg_match('/^[0-9a-f]{32}\.(webp|jpg)$/', $filename) !== 1) {
             return null;
         }
 
-        $subdir = $variant === 'full' ? 'nft' : 'nft/preview';
+        $subdir = $variant === 'full' ? $collection : $collection . '/preview';
         $path = Config::string('app.storage', BASE_PATH . '/storage') . '/' . $subdir . '/' . $filename;
 
         return is_file($path) ? $path : null;
@@ -280,14 +286,14 @@ final class ImageStore
     }
 
     /** Remove both variants of a stored image. */
-    public static function delete(?string $imagePath, ?string $previewPath): void
+    public static function delete(?string $imagePath, ?string $previewPath, string $collection = 'nft'): void
     {
         foreach ([[$imagePath, 'full'], [$previewPath, 'preview']] as [$name, $variant]) {
             if ($name === null || $name === '') {
                 continue;
             }
 
-            $path = self::absolutePath($name, $variant);
+            $path = self::absolutePath($name, $variant, $collection);
             if ($path !== null) {
                 @unlink($path);
             }

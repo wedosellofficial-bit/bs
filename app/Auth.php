@@ -724,6 +724,27 @@ final class Auth
         return $user;
     }
 
+    /**
+     * Membership guard. Called by Router for every route that
+     * Router::membershipGateApplies() decides needs it - see that
+     * method for the exempt list and gate modes.
+     *
+     * Admins bypass this entirely: an admin account that has not itself
+     * paid the membership fee must still be able to reach the admin
+     * panel and every other route, or locking yourself out becomes a
+     * real way to lock yourself out.
+     */
+    public static function requireMembership(): array
+    {
+        $user = self::requireLogin();
+
+        if ($user['role'] === 'admin' || \App\Membership::isMember($user)) {
+            return $user;
+        }
+
+        Lib\Response::redirect('/membership');
+    }
+
     //-----------------------------------------------------------------
     // Flash messages
     //-----------------------------------------------------------------

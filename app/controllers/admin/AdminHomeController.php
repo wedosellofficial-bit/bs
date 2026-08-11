@@ -7,8 +7,10 @@ namespace App\Controllers\Admin;
 use App\Auth;
 use App\Controllers\Controller;
 use App\Database;
+use App\Membership;
 use App\Nft;
 use App\Orders;
+use App\ProductOrders;
 
 final class AdminHomeController extends Controller
 {
@@ -19,6 +21,8 @@ final class AdminHomeController extends Controller
         $this->view('admin/dashboard', [
             'title'       => 'Admin',
             'orderStats'  => Orders::stats(),
+            'productOrderStats' => ProductOrders::stats(),
+            'membershipStats'   => Membership::stats(),
             'queueCounts' => Nft::queueCounts(),
             'inventory'   => Database::first(
                 "SELECT

@@ -155,7 +155,11 @@ count($fonts) >= 7
 //---------------------------------------------------------------------
 section('Storage');
 
-foreach (['storage', 'storage/nft', 'storage/nft/preview', 'storage/logs', 'storage/tmp'] as $dir) {
+foreach ([
+    'storage', 'storage/nft', 'storage/nft/preview',
+    'storage/product', 'storage/product/preview', 'storage/products',
+    'storage/logs', 'storage/tmp',
+] as $dir) {
     $full = $root . '/' . $dir;
 
     if (!is_dir($full)) {
@@ -248,6 +252,17 @@ Config::bool('chain.require_taproot', true)
     ? report('ok', 'Taproot payouts required', 'yes')
     : report('warn', 'Taproot payouts required', 'DISABLED - inscriptions can be sent to wallets that lose them');
 
+// Membership gate mode. 'all' is a full paywall (this store's chosen
+// default) - worth a loud confirmation, not a silent pass, since it is
+// the difference between an open storefront and a closed one.
+$gate = Config::string('membership.gate', 'all');
+match ($gate) {
+    'all'      => report('ok', 'MEMBERSHIP_GATE', 'all - full paywall, nothing browsable until membership'),
+    'purchase' => report('ok', 'MEMBERSHIP_GATE', 'purchase - browsing open, buying requires membership'),
+    'off'      => report('ok', 'MEMBERSHIP_GATE', 'off - membership is a pure optional upgrade'),
+    default    => report('warn', 'MEMBERSHIP_GATE', "unrecognised value '{$gate}' - Router falls back to 'all'"),
+};
+
 //---------------------------------------------------------------------
 section('Database');
 
@@ -292,6 +307,22 @@ if (!Database::isAvailable()) {
 
         $listed = (int) Database::scalar("SELECT COUNT(*) FROM nfts WHERE status = 'listed'", [], 0);
         report($listed > 0 ? 'ok' : 'warn', 'listed inscriptions', (string) $listed);
+
+        $listedProducts = (int) Database::scalar("SELECT COUNT(*) FROM products WHERE status = 'listed'", [], 0);
+        report($listedProducts > 0 ? 'ok' : 'warn', 'listed products', (string) $listedProducts);
+
+        // A listed product with no deliverable would let a purchase
+        // succeed and leave the buyer with nothing to download -
+        // ProductOrders::purchase() already refuses this at the money
+        // layer, but it is worth surfacing before anyone hits it live.
+        $missingDeliverable = (int) Database::scalar(
+            "SELECT COUNT(*) FROM products WHERE status = 'listed' AND deliverable_path IS NULL",
+            [],
+            0
+        );
+        $missingDeliverable === 0
+            ? report('ok', 'products missing a deliverable', '0')
+            : report('fail', 'products missing a deliverable', "{$missingDeliverable} listed with no file attached");
     } catch (Throwable) {
         // Tables not created yet; the migration check above already said so.
     }

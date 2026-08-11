@@ -123,6 +123,16 @@ final class View
         return '/media/' . $variant . '/' . rawurlencode(basename($storedPath));
     }
 
+    /** Same as media(), for the product-preview collection. */
+    public static function productMedia(?string $storedPath, string $variant = 'preview'): string
+    {
+        if ($storedPath === null || $storedPath === '') {
+            return '/assets/img/placeholder.svg';
+        }
+
+        return '/media/product/' . $variant . '/' . rawurlencode(basename($storedPath));
+    }
+
     /** Marks the current section in the nav. */
     public static function isActive(string $prefix): bool
     {

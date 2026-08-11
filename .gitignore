@@ -13,6 +13,13 @@
 !/storage/nft/preview/
 /storage/nft/preview/*
 !/storage/nft/preview/.gitkeep
+/storage/product/*
+!/storage/product/.gitkeep
+!/storage/product/preview/
+/storage/product/preview/*
+!/storage/product/preview/.gitkeep
+/storage/products/*
+!/storage/products/.gitkeep
 /storage/logs/*
 !/storage/logs/.gitkeep
 /storage/tmp/*

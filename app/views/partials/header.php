@@ -13,11 +13,15 @@ use App\Wallet;
 $user = $currentUser ?? null;
 $balance = $user !== null ? Wallet::balance((int) $user['id']) : null;
 
-$nav = [
-    ['/collection', 'Collection'],
-    ['/about', 'About'],
-    ['/faq', 'FAQ'],
-];
+// Config-driven so labels/hrefs can change without touching this view -
+// see the comment on the 'nav' key in app/config.php. Profile is appended
+// here rather than in config because its destination depends on whether
+// anyone is signed in.
+$nav = array_map(
+    static fn (array $item): array => [$item['href'], $item['label']],
+    Config::get('nav', [])
+);
+$nav[] = $user !== null ? ['/account', 'Profile'] : ['/login', 'Profile'];
 ?>
 <header class="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/90 backdrop-blur">
     <div class="mx-auto flex h-16 w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">

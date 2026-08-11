@@ -21,6 +21,9 @@ $sections = [
     ['/admin/transfers', 'Transfer queue'],
     ['/admin/orders', 'Orders'],
     ['/admin/inventory', 'Inventory'],
+    ['/admin/products', 'Products'],
+    ['/admin/products/categories', 'Categories & tags'],
+    ['/admin/product-orders', 'Product orders'],
     // Manual BTC deposits are credited from a user's own page (Users ->
     // select a user -> Manual adjustment), not a separate Deposits
     // screen - see AdminUserController::manualCredit().

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Lib;
 
 use App\Auth;
+use App\Membership;
 
 /**
  * Pattern router.
@@ -18,6 +19,10 @@ use App\Auth;
  * cron endpoint (authenticated by a bearer token or query token, not a
  * session). A per-controller check would eventually be forgotten on
  * exactly one form.
+ *
+ * The membership gate is enforced here for the same reason: hiding a nav
+ * link is not access control, and a per-controller check is a check that
+ * a new controller can forget to add. See membershipGateApplies().
  */
 final class Router
 {
@@ -34,6 +39,83 @@ final class Router
         '/cron/run',
         '/cron/migrate',
     ];
+
+    /**
+     * Routes reachable regardless of Membership::gateMode(), when the
+     * mode is 'all' (the operator's chosen default - a full paywall).
+     * Everything here is either how a visitor becomes a member (auth,
+     * the membership page itself, funding the wallet to pay the fee) or
+     * account self-service that has to work before someone has paid
+     * anything - a non-member must still be able to log out or secure
+     * their own account.
+     *
+     * Legal pages (terms/privacy) and support/FAQ stay reachable too:
+     * they are disclosures and help content, not "the store", and most
+     * of them need to be readable before someone hands over payment.
+     *
+     * @var list<string>
+     */
+    private const MEMBERSHIP_EXEMPT = [
+        '/login', '/register', '/logout',
+        '/verify-email', '/verify-email/resend',
+        '/forgot-password', '/reset-password',
+        '/login/2fa',
+        '/membership', '/membership/join',
+        '/account', '/account/settings',
+        '/account/settings/profile', '/account/settings/password', '/account/settings/payout-address',
+        '/account/settings/2fa', '/account/settings/2fa/enable', '/account/settings/2fa/disable',
+        '/account/wallet', '/account/wallet/statement',
+        '/terms', '/privacy', '/faq', '/support',
+        '/cron/run', '/cron/migrate',
+    ];
+
+    /** Prefixes always exempt, regardless of gate mode. @var list<string> */
+    private const MEMBERSHIP_EXEMPT_PREFIXES = ['/admin', '/media'];
+
+    /**
+     * Routes gated even under the looser 'purchase' mode: the money-
+     * moving and post-purchase endpoints, not the browsing pages.
+     *
+     * @var list<string>
+     */
+    private const MEMBERSHIP_PURCHASE_GATED_PATTERNS = [
+        '#^/buy/[^/]+$#',
+        '#^/products/[^/]+/buy$#',
+        '#^/account/product-orders/[^/]+/download$#',
+        '#^/download/[^/]+$#',
+    ];
+
+    /**
+     * Whether $path needs Auth::requireMembership() under the configured
+     * gate mode.
+     */
+    private static function membershipGateApplies(string $path): bool
+    {
+        $mode = Membership::gateMode();
+
+        if ($mode === Membership::GATE_OFF) {
+            return false;
+        }
+
+        foreach (self::MEMBERSHIP_EXEMPT_PREFIXES as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                return false;
+            }
+        }
+
+        if ($mode === Membership::GATE_PURCHASE) {
+            foreach (self::MEMBERSHIP_PURCHASE_GATED_PATTERNS as $pattern) {
+                if (preg_match($pattern, $path) === 1) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // GATE_ALL: everything except the explicit exemptions above.
+        return !in_array($path, self::MEMBERSHIP_EXEMPT, true);
+    }
 
     /** @param array{0:class-string,1:string} $handler */
     public function get(string $pattern, array $handler): void
@@ -96,6 +178,10 @@ final class Router
             if (in_array($lookupMethod, ['POST', 'PUT', 'PATCH', 'DELETE'], true)
                 && !in_array($path, self::CSRF_EXEMPT, true)) {
                 Auth::requireCsrf();
+            }
+
+            if (self::membershipGateApplies($path)) {
+                Auth::requireMembership();
             }
 
             array_shift($matches);
