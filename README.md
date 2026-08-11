@@ -12,19 +12,25 @@ no build step on the server, no long-running processes.
 | **Chain** | Bitcoin Ordinals (inscriptions on sats, no contract address) |
 | **Custody** | Store holds the inscriptions, transfers to buyer after purchase |
 | **Payment** | Site balance, topped up in BTC |
-| **Provider** | Coinbase Commerce |
+| **Provider** | Manual — one operator-held address, credited by hand (Coinbase Commerce built in but disabled) |
 | **Transfer mode** | Manual — admin queue, no signing key on the server |
 
 ---
 
 ## The three things worth knowing before you read the code
 
-**1. Money is created in exactly one place.** `Payments::handleWebhook()`,
-after an HMAC signature check against the raw request body. Not on a page
-load, not on the redirect back from the provider, not from a client-side
-callback. The deposit page polls a status endpoint while you wait, and
-that endpoint is strictly read-only — it reports what the webhook already
-recorded and cannot itself credit anything.
+**1. Deposits are manual, and money is credited in exactly one place.**
+Coinbase Commerce is disabled - not every country can reach it - so
+there is no automatic crediting. The wallet page shows one BTC address
+the operator holds, with a QR code; a customer sends BTC to it, and an
+admin credits their balance by hand from the customer's page in
+`Admin → Users`, after checking the deposit on a block explorer. That
+manual credit is the only place a deposit ever becomes balance - it goes
+through `Wallet::credit()`, the same call every other credit in the
+system uses, so it is indistinguishable on the ledger from any other
+credit. (The Coinbase Commerce integration itself, `App\Payments`, is
+kept in the codebase but unrouted - see the comment at the top of that
+file if a future market makes it usable again.)
 
 **2. Balance is `SUM(amount_minor)`, every time it matters.** `wallet_entries`
 is append-only: no `UPDATE`, no `DELETE`. A refund is a new positive entry
@@ -58,7 +64,7 @@ spending cap and an address allowlist, not before.
 │   ├── Database.php        PDO singleton, transactions with SAVEPOINT nesting
 │   ├── Auth.php            sessions, Argon2id, CSRF, TOTP, guards
 │   ├── Wallet.php          the ledger
-│   ├── Payments.php        Coinbase Commerce charges + webhook handling
+│   ├── Payments.php        Coinbase Commerce charges + webhooks (disabled, see file header)
 │   ├── Nft.php             catalog, filters, transfer queue
 │   ├── Orders.php          the purchase transaction
 │   ├── Ordinals.php        taproot payout policy, inscription ids, explorers
@@ -300,9 +306,17 @@ Copy `.env.example` to `.env` and fill in:
 - `APP_ENV=production`, `APP_URL=https://your-domain`
 - `APP_KEY` — `base64_encode(random_bytes(32))`
 - `DB_*` — from step 1
-- `COINBASE_COMMERCE_API_KEY` and `COINBASE_COMMERCE_WEBHOOK_SECRET`
+- `MANUAL_BTC_ADDRESS` — a BTC address you control, for customer deposits.
+  Any address type works here (this is not the taproot-only rule that
+  applies to buyer payout addresses) — use whatever your own wallet gives
+  you as its receive address.
 - `MAIL_*` — a mailbox created in hPanel → Emails
 - `CRON_TOKEN` — `bin2hex(random_bytes(24))`
+
+`COINBASE_COMMERCE_*` can be left blank — that integration is disabled by
+default (Coinbase Commerce isn't reachable from every country). See
+[Switching payment methods](#switching-payment-methods) below if you want
+it back.
 
 Set PHP to 8.2 or newer in hPanel → **PHP Configuration**, with `pdo_mysql`,
 `gd`, `curl`, `mbstring`, `openssl` and `sodium` enabled (all are on by
@@ -366,31 +380,16 @@ the rest:
 
 Everything is idempotent and safe to run more often than scheduled.
 
-### 8. Register the webhook
+### 8. Confirm the deposit address is right
 
-Coinbase Commerce dashboard → **Settings → Webhook subscriptions**:
-
-```
-Endpoint URL:  https://your-domain/webhooks/coinbase
-```
-
-Then **Show shared secret** and put that value in
-`COINBASE_COMMERCE_WEBHOOK_SECRET`. It is not the API key — the handler
-verifies `X-CC-Webhook-Signature` as `HMAC-SHA256(raw_body, shared_secret)`,
-and with the wrong secret every delivery is rejected with a 400.
-
-Subscribe to at least:
-
-- `charge:pending` — payment seen, records the txid
-- `charge:confirmed` and `charge:resolved` — settles and credits
-- `charge:failed`
-- `charge:delayed` — underpaid or paid late; flagged for review, never
-  auto-credited
-
-Test it with the dashboard's "Send test webhook", then check
-**Admin → Deposits** — accepted-but-unprocessed deliveries are listed at
-the top of that screen, because each one is a payment the provider thinks
-it told you about.
+There is no webhook to register — deposits are manual. What matters here
+is that `MANUAL_BTC_ADDRESS` in `.env` is genuinely an address you
+control: `php bin/doctor.php` checks it is *structurally* a valid
+Bitcoin address, which catches a typo but cannot catch "valid address
+that isn't yours." Send a small test amount to it yourself and confirm
+you can see it land in your own wallet before announcing the store is
+live — every customer deposit goes to this one address, so a mistake
+here affects all of them, not just one order.
 
 ### 9. Check the deploy
 
@@ -437,15 +436,50 @@ If something goes wrong, **Report a problem** with a reason. The reason is
 shown to whoever picks it up next, and to the buyer on their order page.
 Refund from **Admin → Orders** if the buyer should get their money back.
 
-### When a deposit needs a human
+### Crediting a deposit
 
-`underpaid` covers both underpayments and payments that arrived after the
-quote expired. Neither is auto-credited: the amount may not match the
-quote, and crediting a stale rate automatically is a dispute waiting to
-happen. **Admin → Deposits → Credit manually** takes an amount and a
-reason, and goes through the same wallet lock and the same uniqueness
-constraint as the automatic path — so it cannot double-credit a deposit
-the webhook later resolves.
+Every deposit needs a human — there is no automatic path. Once you can
+see a customer's transaction to the store's BTC address on a block
+explorer with enough confirmations for your comfort, go to
+**Admin → Users**, find them, and use **Manual adjustment**: credit
+direction, the amount in your ledger currency, and a reason — put the
+transaction id in the reason so there is a record of which on-chain
+payment this credit corresponds to. It goes through the same
+`Wallet::credit()` call as every other credit, inside the same per-user
+row lock, so it is exactly as safe as any other ledger write and shows
+up on the customer's statement the same way.
+
+There is no separate "deposits" queue to work through — a customer's
+own message to you (with their transaction id) is what tells you a
+credit is needed.
+
+### Switching payment methods
+
+Manual is the default because Coinbase Commerce isn't reachable from
+every country. If that changes for you, or you'd rather run automatic
+crediting from the start:
+
+1. Fill in `COINBASE_COMMERCE_API_KEY` and `COINBASE_COMMERCE_WEBHOOK_SECRET`
+   in `.env` (see the commented-out section in `.env.example`).
+2. Re-add the webhook route in `index.php`:
+   `$router->post('/webhooks/coinbase', [WebhookController::class, 'coinbase']);`
+   — and restore `app/controllers/WebhookController.php` from git history
+   (`git log --all --oneline -- app/controllers/WebhookController.php`
+   finds the commit that removed it).
+3. `App\Payments` (address generation, webhook handling, idempotency) was
+   never removed, only unrouted — it needs no changes.
+4. Bring back the "generate address" form and per-deposit status page on
+   the wallet screen; `WalletController` and `account/wallet.php` as they
+   stand now are the manual-flow versions, from before this repo's git
+   history shows the switch to manual.
+5. Register the webhook in the Coinbase Commerce dashboard: **Settings →
+   Webhook subscriptions**, endpoint `https://your-domain/webhooks/coinbase`,
+   subscribe to at least `charge:pending`, `charge:confirmed`,
+   `charge:resolved`, `charge:failed`, `charge:delayed`.
+
+Going the other way (automatic → manual) is what this store's config is
+already set up for — just leave `COINBASE_COMMERCE_API_KEY` blank and
+set `MANUAL_BTC_ADDRESS`, no code changes needed.
 
 ---
 
@@ -453,22 +487,29 @@ the webhook later resolves.
 
 Beyond the three points at the top:
 
-- **Webhooks** — signature verified against the raw body before parsing.
-  Idempotency is layered: `UNIQUE(provider, event_id)` on `webhook_events`,
-  `UNIQUE(provider, provider_charge_id)` on `deposits` (re-read
-  `FOR UPDATE` before crediting), and
-  `UNIQUE(type, reference_type, reference_id)` on `wallet_entries`. Any one
-  would usually do; all three are cheap, and the failure they prevent is
-  "we gave away money and found out at reconciliation".
+- **Manual deposits** — the only way a deposit becomes balance is an
+  admin's own `Wallet::credit()` call from `Admin → Users`, inside that
+  user's row lock. There is no automatic path to audit for double-crediting
+  because there is no automatic path at all. (The Coinbase Commerce
+  webhook handler is still in the codebase, disabled - its idempotency
+  is layered three ways for when/if it's re-enabled: `UNIQUE(provider,
+  event_id)` on `webhook_events`, `UNIQUE(provider, provider_charge_id)`
+  on `deposits`, and `UNIQUE(type, reference_type, reference_id)` on
+  `wallet_entries`.)
 - **Purchases** — two different races, closed separately.
   `Wallet::withUserLock()` serialises per buyer so one balance cannot fund
-  two purchases; a `SELECT ... FOR UPDATE` on the item row plus
-  `UNIQUE(nft_id)` on `orders` stops two buyers taking the same
-  inscription. Lock order is always user-then-item.
+  two purchases; a `SELECT ... FOR UPDATE` on the item row stops two
+  buyers taking the same inscription — the second transaction blocks on
+  that lock and sees the item already sold once it can proceed. There is
+  deliberately no unique constraint on `orders.nft_id` backing this up,
+  because that would also forbid ever reselling a refunded item (see
+  migration 006). Lock order is always user-then-item.
 - **CSRF** — enforced in the router for every POST/PUT/PATCH/DELETE, with
-  an explicit exemption list holding only the two endpoints that have no
-  session (the webhook, authenticated by HMAC; cron, by bearer token). A
-  per-controller check eventually gets forgotten on exactly one form.
+  an explicit exemption list holding only the one endpoint that has no
+  session (cron, authenticated by a bearer or query token, not a
+  webhook signature - the endpoint that used HMAC signing is currently
+  unrouted, see above). A per-controller check eventually gets forgotten
+  on exactly one form.
 - **Payout addresses** — full bech32m checksum validation, taproot only.
   A legacy or bc1q address is rejected with an error that says what to use
   instead, because "invalid address" reads like a typo and invites a

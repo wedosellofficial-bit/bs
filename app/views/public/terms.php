@@ -31,11 +31,10 @@ $store = Config::string('app.name');
 
         <h2 class="pt-2 font-display text-2xl text-ink-100">3. Deposits</h2>
         <p>
-            Deposits are credited after the confirmations stated at the time of the deposit. The
-            exchange rate applied is the one quoted when your deposit address was generated, valid
-            for the stated window. Payments arriving after that window, or for less than the
-            quoted amount, are held for manual review and may be credited at a different rate or
-            returned.
+            Deposits are sent to a single address we control and are credited to your balance
+            manually, after we have checked the transaction on a block explorer. Crediting is not
+            automatic and is not instant. The exchange rate applied is the one in effect when we
+            review the deposit, not when you sent it.
         </p>
 
         <h2 class="pt-2 font-display text-2xl text-ink-100">4. Transfers are final</h2>

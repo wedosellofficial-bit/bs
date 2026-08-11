@@ -15,9 +15,9 @@ use App\Auth;
  * CSRF is enforced here rather than in each controller. Every POST, PUT,
  * PATCH and DELETE is checked before dispatch, with an explicit opt-out
  * list for the two endpoints that cannot present a session token: the
- * payment provider's webhook (authenticated by HMAC signature) and the
- * cron endpoint (authenticated by a bearer token). A per-controller check
- * would eventually be forgotten on exactly one form.
+ * cron endpoint (authenticated by a bearer token or query token, not a
+ * session). A per-controller check would eventually be forgotten on
+ * exactly one form.
  */
 final class Router
 {
@@ -31,7 +31,6 @@ final class Router
      * @var list<string>
      */
     private const CSRF_EXEMPT = [
-        '/webhooks/coinbase',
         '/cron/run',
         '/cron/migrate',
     ];

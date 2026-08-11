@@ -204,6 +204,27 @@ $t->ok(!$result['ok'], 'rejects a bc1p address with a bad checksum');
 $t->ok(str_contains($result['error'], 'checksum'), '  error mentions the checksum, not the format');
 
 //---------------------------------------------------------------------
+// General address validity - used for the store's OWN manual deposit
+// address, which unlike a buyer payout address is not restricted to
+// taproot: it just needs to be some address the operator's wallet can
+// receive plain BTC on.
+$t->group('General Bitcoin address validity (manual deposit address)');
+
+$t->ok(Ordinals::isValidBitcoinAddress($taproot), 'accepts a taproot address');
+$t->ok(Ordinals::isValidBitcoinAddress($segwitV0), 'accepts a SegWit v0 address (rejected for payouts, fine for deposits)');
+$t->ok(Ordinals::isValidBitcoinAddress($legacy), 'accepts a legacy P2PKH address');
+$t->ok(Ordinals::isValidBitcoinAddress($p2sh), 'accepts a P2SH address');
+$t->ok(Ordinals::isValidBitcoinAddress(strtoupper($taproot)), 'accepts uppercase bech32m');
+$t->ok(!Ordinals::isValidBitcoinAddress(''), 'rejects an empty string');
+$t->ok(!Ordinals::isValidBitcoinAddress('not-an-address'), 'rejects garbage');
+$t->ok(!Ordinals::isValidBitcoinAddress('1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNb'), 'rejects a legacy address with a mutated checksum');
+$t->ok(
+    !Ordinals::isValidBitcoinAddress('tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7'),
+    'rejects a testnet bech32 address when the configured network is mainnet'
+);
+$t->ok(!Ordinals::isValidBitcoinAddress("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3\nk2e72q4k9hcz7vqzk5jj0"), 'rejects an address with an embedded line break');
+
+//---------------------------------------------------------------------
 $t->group('Base58Check');
 
 $t->ok(Base58Check::decode($legacy) !== null, 'decodes a known P2PKH address');

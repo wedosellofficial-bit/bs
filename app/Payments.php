@@ -15,6 +15,26 @@ use Throwable;
 /**
  * Coinbase Commerce integration: charge creation and webhook handling.
  *
+ * DISABLED. Coinbase Commerce is not reachable from this store's
+ * operating country. Nothing in the application calls createDeposit()
+ * or handleWebhook() any more - there is no route to /webhooks/coinbase
+ * (WebhookController was removed) and no UI that calls createDeposit().
+ * The live deposit path is a single operator-held BTC address shown on
+ * the wallet page (see WalletController, App\Lib\Config's
+ * 'manual_deposit' section), credited by hand through
+ * AdminUserController::manualCredit() - the same ledger write every
+ * other credit goes through.
+ *
+ * This class is kept, not deleted, in case a future market makes
+ * Coinbase Commerce usable for this store again: re-add the webhook
+ * route and the wallet-page "generate address" form (see git history
+ * around the commit that disabled this) and it should work unchanged.
+ * The `deposits` and `exchange_rates` tables it reads and writes are
+ * likewise still in the schema, empty and harmless.
+ *
+ * Everything below this point describes the class as it behaves WHEN
+ * routed to, which is why the original design notes are left intact.
+ *
  * The one rule that shapes this whole file
  * ----------------------------------------
  * Money is created in exactly one place - handleWebhook(), after a

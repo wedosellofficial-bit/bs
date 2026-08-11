@@ -112,7 +112,7 @@ use App\Lib\View;
         <ol class="mt-8 grid gap-8 sm:grid-cols-3">
             <?php
             $steps = [
-                ['Top up', 'Add balance with BTC. We generate a fresh deposit address per top-up and credit you once the payment confirms.'],
+                ['Top up', 'Send BTC to our deposit address, shown on your wallet page. An admin checks it on-chain and credits your balance by hand.'],
                 ['Buy', 'Pick a piece and pay from your balance. You give us the taproot address it should go to, and confirm it before anything is charged.'],
                 ['Receive', 'An admin sends the inscription from the project wallet and records the transaction id. You can follow it on a block explorer.'],
             ];

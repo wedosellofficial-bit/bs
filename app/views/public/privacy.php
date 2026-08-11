@@ -16,8 +16,7 @@ use App\Lib\Fmt;
         <ul class="list-disc space-y-1.5 pl-5">
             <li>Your email address, and a display name if you set one.</li>
             <li>A hash of your password. We never store the password itself.</li>
-            <li>Your ledger: every credit and debit on your balance.</li>
-            <li>Deposit records, including the deposit address and transaction id.</li>
+            <li>Your ledger: every credit and debit on your balance, including deposits credited manually and whatever note the admin who credited it attached.</li>
             <li>Payout addresses you supply, and the transaction ids of transfers to them.</li>
             <li>Sign-in times and the IP address of your most recent sign-in.</li>
         </ul>
@@ -26,9 +25,9 @@ use App\Lib\Fmt;
         <ul class="list-disc space-y-1.5 pl-5">
             <li>No third-party analytics, no advertising pixels, no tracking scripts.</li>
             <li>
-                No third-party requests from pages that display an address. Fonts, scripts and QR
-                codes are all served from this domain, so your deposit address is never sent to
-                another company's logs.
+                No third-party requests from pages that display an address, including our own
+                deposit address and any payout address you supply. Fonts, scripts and QR codes are
+                all served from this domain rather than a third-party service.
             </li>
             <li>Full addresses are truncated in our own application logs.</li>
             <li>We never ask for a seed phrase or private key, and never will.</li>

@@ -5,18 +5,6 @@ use App\Lib\Fmt;
 ?>
 <h1 class="font-display text-3xl text-ink-100">Overview</h1>
 
-<?php if ($failedWebhooks !== []): ?>
-    <div class="flash flash-error mt-6">
-        <div>
-            <p class="font-medium"><?= count($failedWebhooks) ?> webhook deliveries were accepted but not processed.</p>
-            <p class="mt-1 text-sm opacity-90">
-                Each one is a payment the provider believes it told us about. Check the
-                <a href="/admin/deposits" class="underline">deposits screen</a> and credit manually if needed.
-            </p>
-        </div>
-    </div>
-<?php endif; ?>
-
 <?php if (($queueCounts['pending'] ?? 0) > 0 || ($queueCounts['failed'] ?? 0) > 0): ?>
     <div class="flash flash-info mt-6">
         <div>
@@ -35,7 +23,11 @@ use App\Lib\Fmt;
         ['Revenue', Fmt::money((int) $orderStats['revenue_minor']), 'excluding refunds'],
         ['Orders', number_format((int) $orderStats['total']), (int) $orderStats['open_orders'] . ' still open'],
         ['Listed', number_format((int) ($inventory['listed'] ?? 0)), number_format((int) ($inventory['total'] ?? 0)) . ' in inventory'],
-        ['Users', number_format($userCount), number_format((int) ($deposits['pending'] ?? 0)) . ' deposits pending'],
+        [
+            'Manual credits (7d)',
+            Fmt::money((int) ($recentManualCredits['total_minor'] ?? 0)),
+            number_format((int) ($recentManualCredits['count'] ?? 0)) . ' credited, ' . number_format($userCount) . ' users total',
+        ],
     ];
     foreach ($tiles as [$label, $value, $sub]):
         ?>

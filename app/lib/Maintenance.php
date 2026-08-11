@@ -61,6 +61,13 @@ final class Maintenance
             // Quotes whose lock window passed with no payment. Only touches
             // rows still `pending` - a payment that arrived late is handled
             // by charge:delayed and must not be stomped on here.
+            //
+            // While Coinbase Commerce is disabled (see Payments.php), this
+            // is a permanent no-op: nothing inserts into `deposits` any
+            // more, so there is never a row for it to touch. Left in
+            // rather than removed - it costs one harmless query per run,
+            // and comes back to life automatically if Coinbase Commerce
+            // is ever re-enabled.
             'expired_quotes' => static fn (): int => Payments::expireStaleQuotes(),
 
             // Transfer claims an admin opened and walked away from.

@@ -153,6 +153,13 @@ return [
         'explorer_insc'   => $get('EXPLORER_INSCRIPTION_URL', 'https://ordinals.com/inscription/%s'),
     ],
 
+    // Disabled: Coinbase Commerce is not reachable from this store's
+    // operating country. Nothing in the application routes to
+    // Payments::createDeposit() or ::handleWebhook() any more - see
+    // 'manual_deposit' below for the live deposit path. Left populated,
+    // rather than deleted, in case a future market makes Coinbase
+    // Commerce usable again; every read here is still `getenv()`-first
+    // (see the $get closure above) so it costs nothing to leave in place.
     'payments' => [
         'provider'        => 'coinbase_commerce',
         'api_url'         => rtrim($get('COINBASE_COMMERCE_API_URL', 'https://api.commerce.coinbase.com'), '/'),
@@ -163,6 +170,17 @@ return [
         'quote_lock'      => $int('DEPOSIT_QUOTE_LOCK_SECONDS', 3600),
         'network_fee'     => $int('DEPOSIT_DISCLOSED_NETWORK_FEE_MINOR', 0),
         'fee_bps'         => $int('DEPOSIT_FEE_BPS', 0),
+    ],
+
+    // The live deposit path: a single BTC address the operator holds,
+    // shown on the wallet page with a QR code. There is no per-user
+    // address, no webhook, and no automatic crediting - an admin credits
+    // the buyer's balance by hand, through the same ledger every other
+    // credit goes through (Wallet::credit(), from
+    // AdminUserController::manualCredit()), after checking the deposit
+    // on a block explorer.
+    'manual_deposit' => [
+        'btc_address' => $get('MANUAL_BTC_ADDRESS'),
     ],
 
     'mail' => [

@@ -4,10 +4,9 @@ use App\Lib\Config;
 use App\Lib\Fmt;
 
 $faqs = [
-    ['How do I pay?', 'You add funds to a store balance using BTC, then buy from that balance. Generating a top-up creates a fresh deposit address and quotes you an exact BTC amount at a rate locked for a set window.'],
-    ['When is my deposit credited?', 'After ' . Config::int('payments.required_confs', 2) . ' confirmations. The deposit page updates itself while you wait, and your balance appears the moment the payment provider confirms settlement.'],
-    ['What if I send the wrong amount?', 'An underpayment is held for manual review rather than credited automatically at a stale rate. Contact support with your deposit reference and we will sort it out. Overpayments are credited at the settled value.'],
-    ['What if I send after the quote expires?', 'The rate you were quoted no longer applies, so the payment is flagged for review instead of being credited at whatever the rate happens to be. Start a new top-up rather than sending to an expired address.'],
+    ['How do I pay?', 'Send BTC to the deposit address shown on your wallet page. It is a single permanent address, the same one for every customer - not a fresh one generated per top-up.'],
+    ['When is my deposit credited?', 'By hand, after an admin checks your transaction on a block explorer and confirms it has settled. This is not automatic, so it will not appear the moment your transaction confirms - allow up to a day, and contact support with your transaction id if it has been longer.'],
+    ['What if I send the wrong amount?', 'Whatever amount arrives is what gets credited, converted at the rate on the day it is reviewed. There is no quote to over- or under-pay against - just send what you want to add.'],
     ['Which wallet addresses can receive an inscription?', 'Taproot addresses only, starting bc1p. Use the Ordinals receive address from Xverse, Leather, Unisat or a similar ordinals-aware wallet. Do not use an exchange deposit address: exchanges do not track inscriptions and yours would very likely be lost.'],
     ['How long does a transfer take?', 'Transfers are sent by hand, normally within one business day. You can follow the transaction on a block explorer from your order page as soon as it is broadcast.'],
     ['Can I cancel or get a refund?', 'Before the inscription is sent, yes - contact support and we will refund your balance. Once it has been transferred on-chain it belongs to you and cannot be reversed by anyone, including us.'],

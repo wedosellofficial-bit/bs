@@ -25,7 +25,6 @@ declare(strict_types=1);
 require __DIR__ . '/app/bootstrap.php';
 
 use App\Controllers\Admin\AdminAnnouncementController;
-use App\Controllers\Admin\AdminDepositController;
 use App\Controllers\Admin\AdminHomeController;
 use App\Controllers\Admin\AdminInventoryController;
 use App\Controllers\Admin\AdminOrderController;
@@ -40,7 +39,6 @@ use App\Controllers\MediaController;
 use App\Controllers\OrderController;
 use App\Controllers\PageController;
 use App\Controllers\WalletController;
-use App\Controllers\WebhookController;
 use App\Lib\Router;
 
 $router = new Router();
@@ -102,17 +100,13 @@ $router->post('/account/settings/2fa/disable', [AccountController::class, 'disab
 
 //---------------------------------------------------------------------
 // Wallet
+//
+// Deposits are manual - one operator-held address shown with a QR code,
+// credited by an admin from the user's account page after checking a
+// block explorer. No address-generation route, no webhook.
 //---------------------------------------------------------------------
 $router->get('/account/wallet', [WalletController::class, 'index']);
 $router->get('/account/wallet/statement', [WalletController::class, 'statement']);
-// Generating an address calls the provider's API and costs rate-limit
-// budget, so it is a POST with its own limiter - never a page load.
-$router->post('/account/wallet/topup', [WalletController::class, 'createTopUp']);
-$router->get('/account/wallet/deposit/{id}', [WalletController::class, 'showDeposit']);
-// Polled by the deposit page to reflect confirmations as they arrive.
-// Read-only: it reports what the webhook has already recorded and can
-// never itself credit anything.
-$router->get('/account/wallet/deposit/{id}/status', [WalletController::class, 'depositStatus']);
 
 //---------------------------------------------------------------------
 // Purchase
@@ -123,11 +117,16 @@ $router->post('/buy/{id}', [OrderController::class, 'purchase']);
 //---------------------------------------------------------------------
 // Machine endpoints
 //
-// Both are CSRF-exempt (see Router::CSRF_EXEMPT) because neither has a
-// session: the webhook is authenticated by HMAC signature over the raw
-// body, the cron endpoint by a token in the query string.
+// CSRF-exempt (see Router::CSRF_EXEMPT) because it has no session: the
+// cron endpoint is authenticated by a token in the query string.
+//
+// There used to also be a /webhooks/coinbase endpoint here. It is
+// removed, not just unrouted, because Coinbase Commerce is disabled -
+// see the comment at the top of Payments.php. Re-add
+// `$router->post('/webhooks/coinbase', [WebhookController::class, 'coinbase']);`
+// and restore WebhookController.php from git history if it is ever
+// re-enabled.
 //---------------------------------------------------------------------
-$router->post('/webhooks/coinbase', [WebhookController::class, 'coinbase']);
 $router->get('/cron/run', [CronController::class, 'run']);
 $router->post('/cron/run', [CronController::class, 'run']);
 $router->get('/cron/migrate', [CronController::class, 'migrate']);
@@ -164,8 +163,11 @@ $router->post('/admin/transfers/{id}/sent', [AdminTransferController::class, 'ma
 $router->post('/admin/transfers/{id}/complete', [AdminTransferController::class, 'markComplete']);
 $router->post('/admin/transfers/{id}/failed', [AdminTransferController::class, 'markFailed']);
 
-$router->get('/admin/deposits', [AdminDepositController::class, 'index']);
-$router->post('/admin/deposits/{id}/credit', [AdminDepositController::class, 'manualCredit']);
+// AdminDepositController is removed along with Coinbase Commerce - see
+// the comment above the machine-endpoints block. Manual deposit
+// crediting is AdminUserController::manualCredit(), routed above under
+// Users; it is the same ledger-safe credit path for every reason a
+// balance changes, deposits included.
 
 $router->get('/admin/announcements', [AdminAnnouncementController::class, 'index']);
 $router->post('/admin/announcements', [AdminAnnouncementController::class, 'store']);

@@ -139,6 +139,49 @@ final class Ordinals
     }
 
     /**
+     * Structural validity check for a general Bitcoin address - any
+     * witness version, or a legacy Base58Check address, on the
+     * configured network. Unlike validatePayoutAddress(), this does NOT
+     * require taproot.
+     *
+     * The taproot-only rule in validatePayoutAddress() exists because a
+     * non-ordinals-aware wallet can lose an inscription sent to it. That
+     * risk is specific to paying OUT an inscription; it has nothing to
+     * do with the store's own address for receiving a plain BTC deposit,
+     * which can legitimately be any address type the operator's wallet
+     * gives them. Used to sanity-check the manual deposit address in
+     * .env, so a typo there - which would misdirect every customer
+     * deposit - fails loudly instead of silently.
+     */
+    public static function isValidBitcoinAddress(string $address): bool
+    {
+        $address = trim($address);
+        if ($address === '' || preg_match('/\s/', $address) === 1) {
+            return false;
+        }
+
+        /** @var list<string> $hrp */
+        $hrp = Config::get('chain.address_hrp', ['bc']);
+
+        if (Bech32::decodeSegwit($address, $hrp) !== null) {
+            return true;
+        }
+
+        $legacy = Base58Check::decode($address);
+        if ($legacy === null) {
+            return false;
+        }
+
+        $mainnet = Config::string('chain.network', 'mainnet') === 'mainnet';
+
+        // P2PKH / P2SH version bytes: mainnet 0x00 / 0x05, test networks
+        // 0x6f / 0xc4. Anything else is not a Bitcoin address at all.
+        $validVersions = $mainnet ? [0x00, 0x05] : [0x6f, 0xc4];
+
+        return in_array($legacy['version'], $validVersions, true);
+    }
+
+    /**
      * Validate an inscription id: the 64-hex txid of the reveal
      * transaction, then `i`, then the inscription's index within it.
      * e.g. 6fb976ab...b6d3i0

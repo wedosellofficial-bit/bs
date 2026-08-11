@@ -29,22 +29,20 @@ final class AdminHomeController extends Controller
                     COUNT(*) AS total
                    FROM nfts"
             ) ?? [],
-            'deposits'    => Database::first(
-                "SELECT
-                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
-                    SUM(CASE WHEN status = 'underpaid' THEN 1 ELSE 0 END) AS needs_review,
-                    CAST(COALESCE(SUM(CASE WHEN status = 'credited' THEN amount_minor_credited ELSE 0 END), 0) AS SIGNED) AS credited_total
-                   FROM deposits"
-            ) ?? [],
             'userCount'   => (int) Database::scalar('SELECT COUNT(*) FROM users', [], 0),
-            // Surfaced prominently: an unprocessed webhook is money the
-            // provider thinks it delivered and we have not acted on.
-            'failedWebhooks' => Database::all(
-                'SELECT id, event_type, process_error, received_at
-                   FROM webhook_events
-                  WHERE processed_at IS NULL AND signature_ok = 1
-                  ORDER BY received_at DESC LIMIT 10'
-            ),
+            // Manual BTC deposits are credited through the same path as
+            // any other balance adjustment (AdminUserController::
+            // manualCredit(), type=adjustment, reference_type=manual),
+            // so this is the closest thing to a "deposits this week"
+            // figure without a separate deposit-tracking table.
+            'recentManualCredits' => Database::first(
+                "SELECT COUNT(*) AS count,
+                        CAST(COALESCE(SUM(amount_minor), 0) AS SIGNED) AS total_minor
+                   FROM wallet_entries
+                  WHERE type = 'adjustment' AND reference_type = 'manual'
+                    AND amount_minor > 0
+                    AND created_at > (UTC_TIMESTAMP() - INTERVAL 7 DAY)"
+            ) ?? [],
             'lastReconciliation' => Database::first(
                 'SELECT * FROM reconciliation_runs ORDER BY id DESC LIMIT 1'
             ),

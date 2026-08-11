@@ -194,6 +194,7 @@ require $root . '/app/bootstrap.php';
 use App\Database;
 use App\Lib\Config;
 use App\Lib\Migrator;
+use App\Ordinals;
 
 $appEnv = Config::string('app.env');
 report($appEnv === 'production' ? 'ok' : 'warn', 'APP_ENV', $appEnv
@@ -217,15 +218,21 @@ Config::string('cron.token') !== ''
     ? report('ok', 'CRON_TOKEN', 'set')
     : report('fail', 'CRON_TOKEN', 'not set - cron and the migrate endpoint are disabled');
 
-Config::string('payments.api_key') !== ''
-    ? report('ok', 'Coinbase Commerce API key', 'set')
-    : report($appEnv === 'production' ? 'fail' : 'warn', 'Coinbase Commerce API key',
-        'not set - top-ups cannot be created');
+// The live deposit path: one operator-held address shown on the wallet
+// page. Getting this wrong misdirects every customer deposit, so it is
+// checked for basic structural validity, not just presence - though
+// that only catches a typo, not the wrong-but-valid address.
+$depositAddress = Config::string('manual_deposit.btc_address');
 
-Config::string('payments.webhook_secret') !== ''
-    ? report('ok', 'Coinbase webhook secret', 'set')
-    : report($appEnv === 'production' ? 'fail' : 'warn', 'Coinbase webhook secret',
-        'not set - every webhook will be rejected, so nothing will ever be credited');
+if ($depositAddress === '') {
+    report($appEnv === 'production' ? 'fail' : 'warn', 'Manual deposit address',
+        'MANUAL_BTC_ADDRESS not set - the wallet page cannot show anything to send to');
+} elseif (!Ordinals::isValidBitcoinAddress($depositAddress)) {
+    report('fail', 'Manual deposit address',
+        'MANUAL_BTC_ADDRESS does not look like a valid Bitcoin address - check it character by character');
+} else {
+    report('ok', 'Manual deposit address', 'set and structurally valid');
+}
 
 $transport = Config::string('mail.transport');
 if ($transport === 'log') {
