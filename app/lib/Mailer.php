@@ -138,38 +138,50 @@ final class Mailer
 
         if ($html === null) {
             $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-            $headers[] = 'Content-Transfer-Encoding: quoted-printable';
+            $headers[] = 'Content-Transfer-Encoding: base64';
 
-            return implode("\r\n", $headers) . "\r\n\r\n" . self::qp($text);
+            return implode("\r\n", $headers) . "\r\n\r\n" . self::b64($text);
         }
 
         $headers[] = 'Content-Type: multipart/alternative; boundary="' . $boundary . '"';
 
         $body = "--{$boundary}\r\n"
             . "Content-Type: text/plain; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
-            . self::qp($text) . "\r\n"
+            . "Content-Transfer-Encoding: base64\r\n\r\n"
+            . self::b64($text) . "\r\n"
             . "--{$boundary}\r\n"
             . "Content-Type: text/html; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
-            . self::qp($html) . "\r\n"
+            . "Content-Transfer-Encoding: base64\r\n\r\n"
+            . self::b64($html) . "\r\n"
             . "--{$boundary}--";
 
         return implode("\r\n", $headers) . "\r\n\r\n" . $body;
     }
 
     /**
-     * Quoted-printable, with SMTP dot-stuffing.
+     * Base64 body encoding, wrapped to 76 columns per RFC 2045.
      *
-     * A line consisting of a single "." terminates the DATA command; a
-     * message body containing one would be truncated there.
+     * This replaced quoted-printable deliberately. Quoted-printable
+     * soft-wraps any line over 76 characters by inserting `=\r\n` mid
+     * -line, and a mail client that is not fully RFC-2045-compliant -
+     * several webmail "linkify this bare URL" heuristics among them -
+     * can auto-link only up to that literal line break, silently
+     * truncating a verification or password-reset URL mid-token. Every
+     * such link then reads as valid but points at a token that is missing
+     * its second half, which looks exactly like "expired" from the
+     * user's side because Auth::consumeToken() never finds a match.
+     *
+     * Base64 has no such failure mode: decoding reassembles the exact
+     * original bytes regardless of where the base64 text itself is
+     * wrapped, because the wrapping does not correspond to anything in
+     * the decoded content - unlike quoted-printable, where a line break
+     * in the ENCODED form can only be removed if the decoder recognises
+     * the trailing `=` as "this is a soft break, not a real one." There is
+     * no equivalent ambiguity to get wrong here.
      */
-    private static function qp(string $text): string
+    private static function b64(string $text): string
     {
-        $encoded = quoted_printable_encode(str_replace(["\r\n", "\r"], "\n", $text));
-        $encoded = str_replace("\n", "\r\n", $encoded);
-
-        return preg_replace('/^\./m', '..', $encoded) ?? $encoded;
+        return chunk_split(base64_encode($text), 76, "\r\n");
     }
 
     private static function encodeHeader(string $value): string
@@ -242,6 +254,57 @@ final class Mailer
     // Message templates
     //-----------------------------------------------------------------
 
+    /**
+     * HTML body for a single-action email: a short intro, one real
+     * `<a href>` button, the same URL printed as visible text underneath
+     * (for a client that strips styling, or a user who wants to copy it
+     * by hand), and a footer note.
+     *
+     * The button is a real anchor - clicking it does not depend on any
+     * mail client's "detect a bare URL in plain text" heuristic, which is
+     * exactly the heuristic that was truncating the token before (see the
+     * note on b64() above). Escaping every value is not optional here:
+     * $url is built from a token we generated, but the store name and
+     * intro strings ultimately trace back to config, and an email client
+     * renders HTML same as a browser does.
+     */
+    private static function actionEmailHtml(
+        string $store,
+        string $intro,
+        string $instruction,
+        string $url,
+        string $buttonLabel,
+        string $footerNote,
+    ): string {
+        $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+
+        return <<<HTML
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+        <body style="margin:0;padding:0;background:#f4f4f5;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        <tr><td align="center">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:10px;padding:36px;">
+        <tr><td style="font-size:19px;font-weight:700;color:#0e0e12;padding-bottom:20px;">{$e($store)}</td></tr>
+        <tr><td style="font-size:15px;line-height:1.6;color:#33333c;padding-bottom:6px;">{$e($intro)}</td></tr>
+        <tr><td style="font-size:15px;line-height:1.6;color:#33333c;padding-bottom:24px;">{$e($instruction)}</td></tr>
+        <tr><td align="center" style="padding-bottom:24px;">
+        <a href="{$e($url)}" style="display:inline-block;background:#f2a03d;color:#1a1206;text-decoration:none;padding:13px 28px;border-radius:8px;font-size:15px;font-weight:700;">{$e($buttonLabel)}</a>
+        </td></tr>
+        <tr><td style="font-size:13px;line-height:1.5;color:#6b6b7b;padding-bottom:20px;">
+        If the button above doesn't work, copy this link into your browser:<br>
+        <a href="{$e($url)}" style="color:#a85f13;word-break:break-all;">{$e($url)}</a>
+        </td></tr>
+        <tr><td style="font-size:13px;line-height:1.5;color:#8b8b9c;border-top:1px solid #e5e5ea;padding-top:16px;">{$e($footerNote)}</td></tr>
+        </table>
+        </td></tr>
+        </table>
+        </body>
+        </html>
+        HTML;
+    }
+
     public static function sendVerification(string $email, string $token): bool
     {
         $url = Config::string('app.url') . '/verify-email?token=' . rawurlencode($token);
@@ -251,9 +314,17 @@ final class Mailer
             $email,
             "Confirm your email for {$store}",
             "Welcome to {$store}.\n\n"
-            . "Confirm this address to activate your account:\n{$url}\n\n"
+            . "Confirm this address to activate your account by opening this link:\n\n{$url}\n\n"
             . "The link is valid for 24 hours.\n\n"
-            . "If you did not create an account, ignore this email - nothing will happen.\n"
+            . "If you did not create an account, ignore this email - nothing will happen.\n",
+            self::actionEmailHtml(
+                $store,
+                'Welcome to ' . $store . '.',
+                'Confirm this address to activate your account.',
+                $url,
+                'Confirm email',
+                'The link is valid for 24 hours. If you did not create an account, ignore this email — nothing will happen.'
+            )
         );
     }
 
@@ -266,10 +337,18 @@ final class Mailer
             $email,
             "Reset your {$store} password",
             "Someone asked to reset the password for this address.\n\n"
-            . "Set a new one here:\n{$url}\n\n"
+            . "Set a new one by opening this link:\n\n{$url}\n\n"
             . "The link is valid for 60 minutes and can only be used once.\n\n"
             . "If this was not you, ignore this email. Your password has not changed, "
-            . "and nobody can sign in without it.\n"
+            . "and nobody can sign in without it.\n",
+            self::actionEmailHtml(
+                $store,
+                'Someone asked to reset the password for this address.',
+                'If this was you, choose a new password now.',
+                $url,
+                'Choose a new password',
+                'The link is valid for 60 minutes and can only be used once. If this was not you, ignore this email — your password has not changed, and nobody can sign in without it.'
+            )
         );
     }
 
