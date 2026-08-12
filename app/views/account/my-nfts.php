@@ -3,9 +3,13 @@ declare(strict_types=1);
 
 /** @var list<array<string,mixed>> $items */
 
+use App\AccountActivation;
+use App\Auth;
 use App\Lib\Fmt;
 use App\Lib\View;
 use App\Ordinals;
+
+$isActive = AccountActivation::isActive(Auth::user());
 ?>
 <div class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
@@ -15,7 +19,11 @@ use App\Ordinals;
     <?php if ($items === []): ?>
         <div class="card mt-8 px-6 py-16 text-center">
             <p class="text-ink-400">You have not bought anything yet.</p>
-            <a href="/collection" class="btn btn-primary mt-5">Browse the collection</a>
+            <?php if ($isActive): ?>
+                <a href="/collection" class="btn btn-primary mt-5">Browse the collection</a>
+            <?php else: ?>
+                <a href="/account/wallet" class="btn btn-primary mt-5">Fund your wallet to browse</a>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="mt-8 grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-3">

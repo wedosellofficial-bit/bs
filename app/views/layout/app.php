@@ -11,12 +11,14 @@ declare(strict_types=1);
  * @var string|null $title
  */
 
+use App\AccountActivation;
 use App\Lib\Config;
 use App\Lib\Fmt;
 use App\Lib\Request;
 use App\Lib\View;
 
 $storeName = Config::string('app.name', 'Billions Store');
+$showActivationReminder = ($currentUser ?? null) !== null && !AccountActivation::isActive($currentUser);
 
 // The signup popup is a nudge for guests on the handful of pages they
 // can actually reach - never for a signed-in visitor, and never on the
@@ -78,6 +80,10 @@ $pageTitle = ($title ?? null) !== null
 
 <?php if ($showSignupPopup): ?>
     <?= View::partial('partials/signup-popup') ?>
+<?php endif; ?>
+
+<?php if ($showActivationReminder): ?>
+    <?= View::partial('partials/activation-reminder') ?>
 <?php endif; ?>
 
 <script src="<?= Fmt::e(View::asset('js/app.js')) ?>" defer></script>

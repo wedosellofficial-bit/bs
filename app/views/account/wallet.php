@@ -22,23 +22,42 @@ declare(strict_types=1);
  */
 
 use App\Lib\Fmt;
+
+$secondExampleMinor = $minActivationMinor * 2;
 ?>
 
 <div class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
     <?php if (!$isActive): ?>
-        <div class="flash flash-info mb-6">
-            <div>
-                <p class="font-medium">
-                    Your account is pending. Fund it with at least <?= Fmt::e(Fmt::money($minActivationMinor)) ?>
-                    to activate and start buying.
-                </p>
-                <p class="mt-1 text-sm">
-                    This is not a fee - the deposit becomes ordinary store balance, spendable on anything, and it
-                    activates your account the instant it is credited. You currently have
-                    <?= Fmt::e(Fmt::money($balance)) ?>; <?= Fmt::e(Fmt::money(max(0, $minActivationMinor - $balance))) ?>
-                    more to go.
-                </p>
+        <div class="mb-8">
+            <p class="text-xs uppercase tracking-[0.14em] text-ember-500">Activate your marketplace access</p>
+            <h1 class="mt-2 font-display text-3xl text-ink-100 sm:text-4xl">Fund your wallet</h1>
+            <p class="mt-3 max-w-2xl text-ink-400">
+                Your account has been created successfully. To enter the Billions Store marketplace &mdash;
+                Shop, Latest, Collections and every product page &mdash; fund your wallet with at least
+                <span class="price text-ink-100"><?= Fmt::e(Fmt::money($minActivationMinor)) ?></span>.
+            </p>
+
+            <div class="flash flash-info mt-4">
+                <div>
+                    <p class="font-medium">
+                        <?= Fmt::e(Fmt::money($minActivationMinor)) ?> is your wallet balance &mdash; not an activation fee.
+                    </p>
+                    <p class="mt-1 text-sm">
+                        It remains fully yours to spend on anything in the marketplace. Deposit
+                        <?= Fmt::e(Fmt::money($minActivationMinor)) ?> and you have
+                        <?= Fmt::e(Fmt::money($minActivationMinor)) ?> available to spend. Deposit
+                        <?= Fmt::e(Fmt::money($secondExampleMinor)) ?> and you have
+                        <?= Fmt::e(Fmt::money($secondExampleMinor)) ?> available to spend &mdash; none of it is held back
+                        or consumed by activation.
+                    </p>
+                    <p class="mt-3 text-sm">
+                        Marketplace access is activated automatically once your wallet balance reaches
+                        <?= Fmt::e(Fmt::money($minActivationMinor)) ?> or more. You currently have
+                        <?= Fmt::e(Fmt::money($balance)) ?>; <?= Fmt::e(Fmt::money(max(0, $minActivationMinor - $balance))) ?>
+                        more to go.
+                    </p>
+                </div>
             </div>
         </div>
     <?php endif; ?>
@@ -134,26 +153,42 @@ use App\Lib\Fmt;
 
                 <?php // ---------- How manual crediting works ---------- ?>
                 <div class="mt-6 border-t border-ink-800 pt-5">
-                    <h3 class="text-sm font-semibold text-ink-100">How this gets credited</h3>
+                    <h3 class="text-sm font-semibold text-ink-100">
+                        <?= $isActive ? 'How this gets credited' : 'How activation works' ?>
+                    </h3>
                     <ol class="mt-3 space-y-2.5 text-sm text-ink-400">
                         <li class="flex gap-2.5">
                             <span class="price shrink-0 text-ember-500">1</span>
-                            <span>Send BTC to the address above from your own wallet.</span>
+                            <span>Copy the deposit address above into your own BTC wallet.</span>
                         </li>
                         <li class="flex gap-2.5">
                             <span class="price shrink-0 text-ember-500">2</span>
+                            <span>
+                                Send a BTC amount equivalent to at least
+                                <?= Fmt::e(Fmt::money($minActivationMinor)) ?><?= $isActive ? '' : ' to activate' ?>.
+                            </span>
+                        </li>
+                        <li class="flex gap-2.5">
+                            <span class="price shrink-0 text-ember-500">3</span>
                             <span>
                                 Wait for it to confirm on the network &mdash; a block explorer
                                 like <span class="ident">mempool.space</span> will show it.
                             </span>
                         </li>
                         <li class="flex gap-2.5">
-                            <span class="price shrink-0 text-ember-500">3</span>
+                            <span class="price shrink-0 text-ember-500">4</span>
                             <span>
-                                An admin checks the deposit and credits your balance by hand.
+                                An admin reviews the deposit and credits your balance by hand.
                                 This is not automatic, so it will not appear the instant your
                                 transaction confirms &mdash; if it has been longer than a day,
                                 contact support with your transaction id.
+                            </span>
+                        </li>
+                        <li class="flex gap-2.5">
+                            <span class="price shrink-0 text-ember-500">5</span>
+                            <span>
+                                Once your wallet balance reaches <?= Fmt::e(Fmt::money($minActivationMinor)) ?> or
+                                more, marketplace access activates automatically &mdash; no further step needed.
                             </span>
                         </li>
                     </ol>

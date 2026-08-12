@@ -667,6 +667,72 @@
   @media (prefers-reduced-motion: reduce) {
     .signup-popup { animation: none; }
   }
+
+  /* --- activation reminder toast ----------------------------------- */
+  .activation-reminder {
+    position: fixed;
+    right: calc(var(--spacing) * 5);
+    bottom: calc(var(--spacing) * 5);
+    z-index: 30;
+    width: min(20rem, calc(100vw - 2.5rem));
+    padding: calc(var(--spacing) * 4) calc(var(--spacing) * 5) calc(var(--spacing) * 4.5);
+    border: 1px solid var(--color-ink-700);
+    border-radius: var(--radius-card);
+    background: var(--color-ink-900);
+    box-shadow: var(--shadow-lift);
+    opacity: 0;
+    transform: translateY(0.5rem);
+    transition: opacity 260ms ease, transform 260ms ease;
+    pointer-events: none;
+  }
+
+  .activation-reminder.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .activation-reminder-title {
+    padding-right: calc(var(--spacing) * 5);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-ember-400);
+  }
+
+  .activation-reminder-text {
+    margin-top: calc(var(--spacing) * 1.5);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-ink-400);
+  }
+
+  .activation-reminder-close {
+    position: absolute;
+    top: calc(var(--spacing) * 3);
+    right: calc(var(--spacing) * 3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--radius-pill);
+    color: var(--color-ink-500);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  .activation-reminder-close:hover {
+    background: var(--color-ink-850);
+    color: var(--color-ink-100);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .activation-reminder { transition: none; }
+  }
 }
 
 @layer utilities {

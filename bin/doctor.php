@@ -253,18 +253,18 @@ Config::bool('chain.require_taproot', true)
     ? report('ok', 'Taproot payouts required', 'yes')
     : report('warn', 'Taproot payouts required', 'DISABLED - inscriptions can be sent to wallets that lose them');
 
-// Account activation - the checkout gate. Separate from the catalog
-// login gate (App\Lib\Router's CATALOG_LOGIN_REQUIRED list): that one
-// decides whether browsing needs a session at all; this one decides
-// whether a signed-in but unfunded account can check out.
+// Account activation. App\Lib\Router's MARKETPLACE_GATE_PATHS list uses
+// this same status to decide whether a signed-in visitor can browse the
+// catalog at all; REQUIRE_ACTIVATION_TO_PURCHASE below is the second,
+// independent check at checkout time.
 $minActivation = Config::int('account.min_activation_minor', 5000);
 $minActivation > 0
     ? report('ok', 'ACCOUNT_MIN_ACTIVATION_MINOR', Fmt::money($minActivation) . ' minimum deposit to activate')
     : report('warn', 'ACCOUNT_MIN_ACTIVATION_MINOR', '0 - every new account is active immediately, no funding required');
 
 Config::bool('account.require_activation_to_purchase', true)
-    ? report('ok', 'REQUIRE_ACTIVATION_TO_PURCHASE', 'true - a pending account can browse but not check out')
-    : report('warn', 'REQUIRE_ACTIVATION_TO_PURCHASE', 'false - activation is informational only; anyone can buy while pending');
+    ? report('ok', 'REQUIRE_ACTIVATION_TO_PURCHASE', 'true - a pending account can neither browse nor check out')
+    : report('warn', 'REQUIRE_ACTIVATION_TO_PURCHASE', 'false - activation still gates browsing, but checkout no longer re-checks it');
 
 //---------------------------------------------------------------------
 section('Database');

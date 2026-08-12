@@ -17,8 +17,8 @@ no build step on the server, no long-running processes.
 | **Payment** | Site balance, topped up in BTC |
 | **Provider** | Manual — one operator-held address, credited by hand (Coinbase Commerce built in but disabled) |
 | **Transfer mode** | Manual — admin queue, no signing key on the server |
-| **Catalog access** | Registration-gated — a guest gets a signup landing page at `/`, not the storefront; browsing requires a signed-in session |
-| **Account activation** | Separate from the above: a signed-in account is `pending` until its wallet reaches `ACCOUNT_MIN_ACTIVATION_MINOR` (default $50) — an ordinary, fully spendable deposit, not a fee. `pending` can browse, not check out |
+| **Catalog access** | Marketplace-gated — a guest gets a signup landing page at `/`, not the storefront; a signed-in but unfunded account is redirected to the wallet funding page instead of the catalog |
+| **Account activation** | A signed-in account is `pending` until its wallet reaches `ACCOUNT_MIN_ACTIVATION_MINOR` (default $50) — an ordinary, fully spendable deposit, not a fee. `pending` can neither browse the marketplace nor check out; only an `active` account can |
 
 ---
 
@@ -52,36 +52,41 @@ cannot move a single inscription, because this host cannot sign. That is
 the whole security argument for starting manual — automate later behind a
 spending cap and an address allowlist, not before.
 
-**4. There are two separate gates, and they answer different questions.**
-The first is *can this visitor see the catalog at all* - answered by a
-signed-in session, enforced once in `Router::dispatch()` via an explicit
-allowlist of gated paths (`Router::CATALOG_LOGIN_REQUIRED` and friends)
-and `Auth::requireLogin()`. A guest hitting `/`, `/shop`, `/collection`,
-`/nft/{id}`, `/products/{slug}`, or even a raw `/media/...` preview-image
-URL gets redirected to `/login?next=<that path>` rather than the real
-page - `HomeController` is the one exception, branching to a
-zero-catalog-data registration landing view instead of redirecting, so
-`/` itself never 404s or bounces for a guest. The second question is
-*can this signed-in account actually buy something* - answered by
-account activation, below. Conflating the two would mean either forcing
-a $50 deposit just to look around, or letting anyone with no account at
-all browse full product/NFT detail pages; this store does neither.
+**4. Browsing and checkout are two enforcement points, but the same
+criterion now decides both: is the account activated.** The router
+answers *can this visitor see the catalog at all* once, in
+`Router::dispatch()`, via an explicit allowlist of gated paths
+(`Router::MARKETPLACE_GATE_PATHS` and friends) and
+`Auth::requireMarketplaceAccess()`. A guest hitting `/shop`, `/latest`,
+`/collection`, `/nft/{id}`, `/products/{slug}`, or even a raw
+`/media/...` preview-image URL gets redirected to `/login?next=<that
+path>`; a signed-in but not-yet-activated account hitting the same paths
+is redirected to `/account/wallet` instead - `HomeController` is the one
+exception for a guest specifically, branching to a zero-catalog-data
+registration landing view instead of redirecting, so `/` itself never
+404s or bounces. Checkout re-checks the same activation status a second
+time, independently, inside the row lock at the moment of purchase (see
+point 5) - it does not trust the fact that the browsing gate was passed
+earlier in the session.
 
-**5. Account activation is a deposit, not a fee, and it only ever gates
-checkout.** `App\AccountActivation`: a new registration starts `pending`
-and becomes `active` automatically the moment any wallet credit brings
-its balance to `ACCOUNT_MIN_ACTIVATION_MINOR` (default $50) -
-`AccountActivation::maybeActivate()`, called from `Wallet::credit()`,
-the one choke point every credit passes through. This is an ordinary,
-fully spendable deposit. It is never converted into a fee, never
-partially withheld, and shows on the customer's statement exactly like
-any other credit - there is no code path here that turns activation into
-a charge, and if you ever find one, that is a bug.
-`REQUIRE_ACTIVATION_TO_PURCHASE` (default true) is what actually enforces
-the checkout block, re-checked inside the same row lock as the purchase
-itself in both `Orders::purchase()` and `ProductOrders::purchase()`, not
-trusted from an earlier page load. A `pending` signed-in account can
-still browse everything the login gate above allows - it just cannot pay.
+**5. Account activation is a deposit, not a fee, and it gates both
+browsing and checkout.** `App\AccountActivation`: a new registration
+starts `pending` and becomes `active` automatically the moment any
+wallet credit brings its balance to `ACCOUNT_MIN_ACTIVATION_MINOR`
+(default $50) - `AccountActivation::maybeActivate()`, called from
+`Wallet::credit()`, the one choke point every credit passes through.
+This is an ordinary, fully spendable deposit. It is never converted into
+a fee, never partially withheld, and shows on the customer's statement
+exactly like any other credit - there is no code path here that turns
+activation into a charge, and if you ever find one, that is a bug.
+`REQUIRE_ACTIVATION_TO_PURCHASE` (default true) is what enforces the
+checkout block specifically, re-checked inside the same row lock as the
+purchase itself in both `Orders::purchase()` and `ProductOrders::purchase()`,
+not trusted from an earlier page load. A `pending` signed-in account is
+redirected to the funding page the moment it tries any catalog URL - see
+point 4 - so in practice it never reaches the checkout re-check at all,
+but that re-check stays in place as a second, independent line of
+defence regardless.
 
 There used to be a third concept, a paid "membership" tier layered on
 top of activation with its own fee and member-only pricing. It has been
@@ -111,7 +116,7 @@ by product decision, not oversight.
 │   ├── Ordinals.php        taproot payout policy, inscription ids, explorers
 │   ├── Product.php         digital-art product catalog, search/filter, categories, tags
 │   ├── ProductOrders.php   the purchase transaction (products) + download tokens
-│   ├── AccountActivation.php  pending -> active at the deposit threshold (the checkout gate)
+│   ├── AccountActivation.php  pending -> active at the deposit threshold (gates both browsing and checkout)
 │   ├── lib/                Bech32, Base58Check, Totp, RateLimiter, Mailer,
 │   │                       ImageStore, DeliverableStore, Router, View, Logger, Config, ...
 │   ├── controllers/
@@ -522,18 +527,22 @@ ordinary balance. It shows on their statement, it is fully spendable,
 and there is no "activation fee" line anywhere in the ledger - only the
 deposit itself, and later, whatever they choose to spend it on.
 
-### Managing the registration gate
+### Managing the marketplace gate
 
-The catalog login gate (point 4 in the intro) is not a setting - it is
-an explicit allowlist of paths in `App\Lib\Router::CATALOG_LOGIN_REQUIRED`
-/ `..._PATTERNS` / `..._PREFIXES`. Adding a new catalog-shaped route
-later (another way to list products, say) means adding it to that list
-deliberately; the default for anything not listed is open, same as every
-other page on the site. `HomeController::index()` is the only controller
-that branches on auth state rather than redirecting - see
-`app/views/public/home-guest.php` for the guest landing page and
-`app/views/partials/signup-popup.php` for the scroll/exit-intent signup
-nudge shown on it (`assets/js/app.js`, "Guest signup popup" section).
+The marketplace gate (point 4 in the intro) is not a setting - it is an
+explicit allowlist of paths in `App\Lib\Router::MARKETPLACE_GATE_PATHS`
+/ `..._PATTERNS` / `..._PREFIXES`, checked by `Auth::requireMarketplaceAccess()`.
+Adding a new catalog-shaped route later (another way to list products,
+say) means adding it to that list deliberately; the default for anything
+not listed is open, same as every other page on the site.
+`HomeController::index()` is the only controller that branches on auth
+state rather than redirecting - see `app/views/public/home-guest.php`
+for the guest landing page and `app/views/partials/signup-popup.php` for
+the scroll/exit-intent signup nudge shown on it (`assets/js/app.js`,
+"Guest signup popup" section). A signed-in but not-yet-activated visitor
+gets a different nudge instead - `app/views/partials/activation-reminder.php`,
+shown on whatever account/funding page they're on, per the "Under-$50
+activation reminder" section of the same file.
 
 ### Crediting a deposit
 
@@ -621,27 +630,29 @@ Beyond the three points at the top:
   not a webhook signature - the endpoint that used HMAC signing is
   currently unrouted, see above). A per-controller check eventually gets
   forgotten on exactly one form.
-- **Catalog login gate** — enforced in the router
-  (`Router::catalogGateApplies()` + `Auth::requireLogin()`, called from
-  `Router::dispatch()`), the same layer CSRF is enforced in and for the
-  same reason: a per-controller check is a check a new controller can
-  forget to add. An explicit allowlist of gated paths, not a denylist of
-  exemptions - the site's default posture is open, so a route not on the
-  list is never accidentally gated. Covers the NFT/product catalog pages
-  *and* the media-preview endpoints (`/media/...`) - a guest gets
-  redirected to `/login?next=<path>` before any catalog HTML, JSON, or
-  image bytes are ever produced, not after. Admin routes are unaffected
-  (they have their own `Auth::requireAdmin()` guard, checked independently).
-- **Account activation** — a *separate* checkout-only gate, deliberately
-  not enforced in the router: a signed-in `pending` account must still be
-  able to browse everything the login gate above allows, so it is instead
-  re-checked inside `Orders::purchase()` and
-  `ProductOrders::purchase()`, inside the same row lock as the purchase
-  itself. `AccountActivation::maybeActivate()` - the only code path that
-  writes `account_status` - never touches `wallet_entries`; it only ever
-  reads the balance that `Wallet::credit()` already wrote and flips a
-  status flag, which is what keeps the activation deposit from ever being
-  anything other than ordinary, fully spendable balance.
+- **Marketplace gate** — enforced in the router
+  (`Router::marketplaceGateApplies()` + `Auth::requireMarketplaceAccess()`,
+  called from `Router::dispatch()`), the same layer CSRF is enforced in
+  and for the same reason: a per-controller check is a check a new
+  controller can forget to add. An explicit allowlist of gated paths, not
+  a denylist of exemptions - the site's default posture is open, so a
+  route not on the list is never accidentally gated. Covers the
+  NFT/product catalog pages, `/latest`, *and* the media-preview endpoints
+  (`/media/...`) - a guest gets redirected to `/login?next=<path>`, and a
+  signed-in but unfunded account to `/account/wallet`, before any catalog
+  HTML, JSON, or image bytes are ever produced, not after. Admin routes
+  are unaffected (they have their own `Auth::requireAdmin()` guard,
+  checked independently).
+- **Account activation** — the status this gate (and checkout) both read.
+  `AccountActivation::maybeActivate()` - the only code path that writes
+  `account_status` - never touches `wallet_entries`; it only ever reads
+  the balance that `Wallet::credit()` already wrote and flips a status
+  flag, which is what keeps the activation deposit from ever being
+  anything other than ordinary, fully spendable balance. Checkout
+  re-checks the same status a second time, independently, inside
+  `Orders::purchase()` and `ProductOrders::purchase()`, inside the same
+  row lock as the purchase itself - defence in depth, not the only place
+  activation is enforced.
 - **Payout addresses** — full bech32m checksum validation, taproot only.
   A legacy or bc1q address is rejected with an error that says what to use
   instead, because "invalid address" reads like a typo and invites a
@@ -682,12 +693,13 @@ Beyond the three points at the top:
   AJAX-fragment pattern the NFT collection browser uses - every filter
   change is a full page load. It works with JavaScript off and needed no
   client-side wiring; it is simply slower to use than the NFT browser.
-- **A `pending` (unfunded) *signed-in* account can still see the entire
-  catalog, minus the ability to check out.** There is no "preview mode"
-  that hides prices or detail pages from an unfunded account -
-  deliberately, since the whole point of activation is that browsing
-  costs nothing. This is different from a *guest*, who cannot reach the
-  catalog at all regardless of funding - see the login gate.
+- **A `pending` (unfunded) *signed-in* account cannot see the catalog
+  either, not just check out of it.** Both the browsing gate and the
+  checkout gate now key off the same activation status - see point 4/5
+  in the intro. There is no "preview mode" that lets an unfunded account
+  see prices or detail pages while still blocking payment; the two used
+  to differ (browsing needed only a session, checkout needed funding),
+  but the current model requires funding for both.
 - **Raising `ACCOUNT_MIN_ACTIVATION_MINOR` does not retroactively demote
   already-active accounts.** Activation is one-directional and checked
   only at credit time (see `AccountActivation::maybeActivate()`); an

@@ -12,9 +12,19 @@ declare(strict_types=1);
 
 use App\Lib\Config;
 use App\Lib\Fmt;
+use App\Lib\Request;
 use App\Lib\View;
 
 $storeName = Config::string('app.name', 'Billions Store');
+
+// Registration and login are the two screens a visitor with no session at
+// all can reach - no marketplace nav, no footer links, nothing but the
+// logo and the form, so the credential flow feels isolated from the
+// marketplace rather than like one more page on the site. The other
+// screens sharing this layout (forgot/reset password, 2FA, verify-email)
+// keep the ordinary logo-left header and legal footer links, since only
+// registration and login are named in the brief.
+$isMinimalAuthPage = in_array(Request::path(), ['/login', '/register'], true);
 ?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
@@ -31,7 +41,7 @@ $storeName = Config::string('app.name', 'Billions Store');
 <body class="flex min-h-screen flex-col">
 
 <header class="border-b border-ink-800">
-    <div class="mx-auto flex h-16 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto flex h-16 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8 <?= $isMinimalAuthPage ? 'justify-center' : '' ?>">
         <a href="/" class="flex items-baseline gap-2">
             <span class="font-display text-2xl text-ink-100">Billions</span>
             <span class="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ember-500">Store</span>
@@ -53,13 +63,15 @@ $storeName = Config::string('app.name', 'Billions Store');
     </div>
 </main>
 
-<footer class="border-t border-ink-800 py-6">
-    <div class="mx-auto flex w-full max-w-7xl flex-wrap gap-x-5 gap-y-1 px-4 text-xs text-ink-600 sm:px-6 lg:px-8">
-        <a href="/terms" class="hover:text-ink-300">Terms</a>
-        <a href="/privacy" class="hover:text-ink-300">Privacy</a>
-        <a href="/faq" class="hover:text-ink-300">FAQ</a>
-    </div>
-</footer>
+<?php if (!$isMinimalAuthPage): ?>
+    <footer class="border-t border-ink-800 py-6">
+        <div class="mx-auto flex w-full max-w-7xl flex-wrap gap-x-5 gap-y-1 px-4 text-xs text-ink-600 sm:px-6 lg:px-8">
+            <a href="/terms" class="hover:text-ink-300">Terms</a>
+            <a href="/privacy" class="hover:text-ink-300">Privacy</a>
+            <a href="/faq" class="hover:text-ink-300">FAQ</a>
+        </div>
+    </footer>
+<?php endif; ?>
 
 <script src="<?= Fmt::e(View::asset('js/app.js')) ?>" defer></script>
 <?php if (($needsQr ?? false) === true): ?>

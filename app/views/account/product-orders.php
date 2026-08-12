@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 /** @var list<array<string,mixed>> $orders */
 
+use App\AccountActivation;
 use App\Auth;
 use App\Lib\Fmt;
 use App\Lib\View;
+
+$isActive = AccountActivation::isActive(Auth::user());
 ?>
 <div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
     <h1 class="font-display text-4xl text-ink-100">Orders</h1>
@@ -15,7 +18,11 @@ use App\Lib\View;
         <?php if ($orders === []): ?>
             <div class="px-6 py-16 text-center">
                 <p class="text-ink-400">No orders yet.</p>
-                <a href="/shop" class="btn btn-primary mt-5">Browse Collections</a>
+                <?php if ($isActive): ?>
+                    <a href="/shop" class="btn btn-primary mt-5">Browse Collections</a>
+                <?php else: ?>
+                    <a href="/account/wallet" class="btn btn-primary mt-5">Fund your wallet to browse</a>
+                <?php endif; ?>
             </div>
         <?php else: ?>
             <div class="table-wrap">

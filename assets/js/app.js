@@ -736,4 +736,64 @@
       if (event.target.closest('[data-popup-close]')) dialog.close();
     });
   })();
+
+  /* ==================================================================
+     Under-$50 activation reminder
+
+     Only rendered (see partials/activation-reminder.php, included from
+     layout/app.php) for a signed-in visitor whose wallet has not yet
+     reached the activation threshold - never for a guest or an already-
+     activated account. It is a plain status toast, not a <dialog>: it
+     must not steal focus or block the page underneath it, since the
+     visitor is meant to keep using the account/funding pages the
+     marketplace gate has already restricted them to. It shows briefly,
+     hides, and repeats every 5 seconds, until dismissed for the rest of
+     this browser session.
+     ================================================================== */
+
+  (function initActivationReminder() {
+    const toast = document.getElementById('activation-reminder');
+    if (!toast) return; // not rendered for guests or activated accounts
+
+    const DISMISSED_FLAG = 'bs_activation_reminder_dismissed';
+    if (sessionStorage.getItem(DISMISSED_FLAG)) return;
+
+    const VISIBLE_MS = 3200;
+    const CYCLE_MS = 5000;
+    let cycleTimer = null;
+    let hideTimer = null;
+
+    const show = () => {
+      toast.hidden = false;
+      // Two ticks so the browser registers `hidden` being cleared before
+      // the transition-triggering class is added - otherwise the fade-in
+      // never runs, it just appears.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        toast.classList.add('is-visible');
+      }));
+
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hide, VISIBLE_MS);
+    };
+
+    const hide = () => {
+      toast.classList.remove('is-visible');
+      clearTimeout(hideTimer);
+    };
+
+    const dismiss = () => {
+      hide();
+      sessionStorage.setItem(DISMISSED_FLAG, '1');
+      clearInterval(cycleTimer);
+      clearTimeout(hideTimer);
+      toast.hidden = true;
+    };
+
+    toast.addEventListener('click', (event) => {
+      if (event.target.closest('[data-activation-reminder-close]')) dismiss();
+    });
+
+    show();
+    cycleTimer = setInterval(show, CYCLE_MS);
+  })();
 })();

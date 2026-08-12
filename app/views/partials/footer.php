@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\AccountActivation;
 use App\Auth;
 use App\Lib\Config;
 use App\Lib\Fmt;
 
-$year = gmdate('Y');
+$footerUser = Auth::user();
+$footerCanBrowse = $footerUser !== null && AccountActivation::isActive($footerUser);
 ?>
 <footer class="mt-20 border-t border-ink-800 bg-ink-950">
     <div class="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -25,7 +27,7 @@ $year = gmdate('Y');
             <div>
                 <h2 class="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-500">Store</h2>
                 <ul class="mt-4 space-y-2 text-sm">
-                    <?php if (Auth::check()): ?>
+                    <?php if ($footerCanBrowse): ?>
                         <li><a href="/collection" class="text-ink-300 transition-colors hover:text-ink-100">Collection</a></li>
                     <?php endif; ?>
                     <li><a href="/about" class="text-ink-300 transition-colors hover:text-ink-100">About</a></li>
@@ -61,7 +63,7 @@ $year = gmdate('Y');
         </div>
 
         <div class="mt-10 flex flex-col gap-2 border-t border-ink-800 pt-6 text-xs text-ink-600 sm:flex-row sm:items-center sm:justify-between">
-            <p>&copy; <?= Fmt::e($year) ?> <?= Fmt::e(Config::string('app.name')) ?>. All sales are final once an inscription is transferred.</p>
+            <p>Right reserved by Kevin</p>
             <p class="font-mono">Prices in <?= Fmt::e(Config::string('ledger.currency', 'USD')) ?>. Not investment advice.</p>
         </div>
     </div>

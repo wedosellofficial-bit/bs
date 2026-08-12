@@ -38,6 +38,7 @@ use App\Controllers\CollectionController;
 use App\Controllers\CronController;
 use App\Controllers\DownloadController;
 use App\Controllers\HomeController;
+use App\Controllers\LatestController;
 use App\Controllers\MediaController;
 use App\Controllers\OrderController;
 use App\Controllers\PageController;
@@ -74,6 +75,11 @@ $router->get('/media/product/{variant}/{file}', [MediaController::class, 'showPr
 $router->get('/shop', [ProductController::class, 'index']);
 $router->get('/products/{slug}', [ProductController::class, 'show']);
 $router->post('/products/{slug}/buy', [ProductController::class, 'buy']);
+
+//---------------------------------------------------------------------
+// "Latest": newest items from both catalogs, one page - see LatestController.
+//---------------------------------------------------------------------
+$router->get('/latest', [LatestController::class, 'index']);
 
 //---------------------------------------------------------------------
 // Authentication

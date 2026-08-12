@@ -26,6 +26,7 @@ use App\Database;
 use App\Lib\Base58Check;
 use App\Lib\Bech32;
 use App\Lib\Fmt;
+use App\Lib\Router;
 use App\Ordinals;
 use App\Payments;
 use App\Product;
@@ -334,6 +335,30 @@ $t->same(Payments::creditableMinor(10000, 100), 9900, '1% fee on $100.00 credits
 $t->same(Payments::creditableMinor(999, 100), 990, 'fee rounds in the store\'s favour, deterministically');
 $t->same(Payments::creditableMinor(1, 100), 1, 'a 1-cent deposit is never reduced to zero');
 $t->same(Payments::creditableMinor(0, 100), 0, 'a zero deposit credits zero');
+
+//---------------------------------------------------------------------
+// The marketplace gate: a pure allowlist predicate, so it is tested here
+// without a database. Router::dispatch() calls Auth::requireMarketplaceAccess()
+// whenever this returns true - see the Router class docblock.
+//---------------------------------------------------------------------
+$t->group('Marketplace gate path allowlist');
+
+foreach (['/shop', '/collection', '/collection/results', '/latest'] as $path) {
+    $t->ok(Router::marketplaceGateApplies($path), "gates {$path}");
+}
+foreach (['/nft/123', '/nft/abc-def', '/buy/123', '/buy/abc-def'] as $path) {
+    $t->ok(Router::marketplaceGateApplies($path), "gates {$path} (pattern match)");
+}
+foreach (['/products/some-slug', '/products/some-slug/buy'] as $path) {
+    $t->ok(Router::marketplaceGateApplies($path), "gates {$path} (pattern match)");
+}
+foreach (['/media/thumb/x.jpg', '/media/product/full/y.png'] as $path) {
+    $t->ok(Router::marketplaceGateApplies($path), "gates {$path} (prefix match)");
+}
+foreach (['/', '/about', '/faq', '/terms', '/privacy', '/news', '/preorder', '/support',
+    '/login', '/register', '/account', '/account/wallet'] as $path) {
+    $t->ok(!Router::marketplaceGateApplies($path), "does not gate {$path}");
+}
 
 //---------------------------------------------------------------------
 // The membership tier has been removed entirely - see App\AccountActivation

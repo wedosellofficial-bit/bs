@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\AccountActivation;
 use App\Auth;
 use App\Database;
 use App\Lib\Config;
@@ -264,6 +265,17 @@ final class AuthController extends Controller
             // was single-use and short-lived, and requiring a second
             // sign-in here only teaches people to ignore the email.
             Auth::completeLogin($user);
+
+            // A brand-new account is always pending at this point - the
+            // marketplace stays locked until it is funded, so send the
+            // visitor straight to the funding page rather than a
+            // dashboard that just tells them the same thing. An account
+            // that was somehow already funded before verifying (an admin
+            // credit landing first) skips straight to the dashboard.
+            if (!AccountActivation::isActive($user)) {
+                $this->back('/account/wallet', 'success', 'Email confirmed. Fund your wallet to activate the marketplace.');
+            }
+
             $this->back('/account', 'success', 'Email confirmed. Welcome.');
         }
 

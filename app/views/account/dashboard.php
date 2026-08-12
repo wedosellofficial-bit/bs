@@ -24,8 +24,8 @@ use App\Lib\View;
             <div>
                 <p class="font-medium">
                     Your account is pending. Fund your wallet with at least
-                    <?= Fmt::e(Fmt::money($minActivationMinor)) ?> to activate it and start buying - browsing
-                    stays free either way.
+                    <?= Fmt::e(Fmt::money($minActivationMinor)) ?> to activate marketplace access - the
+                    catalog and checkout both open up once you do.
                 </p>
                 <a href="/account/wallet" class="mt-1 inline-block text-sm underline">Add funds</a>
             </div>
@@ -81,7 +81,11 @@ use App\Lib\View;
             <?php if ($orders === []): ?>
                 <div class="px-5 py-10 text-center">
                     <p class="text-sm text-ink-500">No orders yet.</p>
-                    <a href="/collection" class="btn btn-secondary btn-sm mt-4">Browse the collection</a>
+                    <?php if ($isActive): ?>
+                        <a href="/collection" class="btn btn-secondary btn-sm mt-4">Browse the collection</a>
+                    <?php else: ?>
+                        <a href="/account/wallet" class="btn btn-secondary btn-sm mt-4">Fund your wallet to browse</a>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <ul class="divide-y divide-ink-800">

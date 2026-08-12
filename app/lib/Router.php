@@ -19,9 +19,10 @@ use App\Auth;
  * session). A per-controller check would eventually be forgotten on
  * exactly one form.
  *
- * The catalog login gate is enforced here for the same reason: hiding a
- * nav link is not access control, and a per-controller check is a check
- * that a new controller can forget to add. See catalogGateApplies().
+ * The marketplace access gate is enforced here for the same reason:
+ * hiding a nav link is not access control, and a per-controller check is
+ * a check that a new controller can forget to add. See
+ * marketplaceGateApplies().
  */
 final class Router
 {
@@ -40,27 +41,38 @@ final class Router
     ];
 
     /**
-     * The NFT and digital-product catalog requires a signed-in session -
-     * everything else on the public site does not. This is an explicit
-     * allowlist of GATED paths, deliberately the opposite shape of the
-     * old CSRF exemption list above: the site's default posture is now
-     * open, so a new route added later is never accidentally gated
-     * unless someone deliberately lists it here. Auth::requireLogin()
-     * redirects to /login?next=<this path>, so a link straight into the
-     * catalog survives the detour through registration.
+     * The NFT and digital-product catalog requires a fully activated
+     * account - signed in AND funded to the activation threshold, not
+     * just signed in. This is an explicit allowlist of GATED paths,
+     * deliberately the opposite shape of the old CSRF exemption list
+     * above: the site's default posture is open, so a new route added
+     * later is never accidentally gated unless someone deliberately
+     * lists it here. Auth::requireMarketplaceAccess() sends a guest
+     * through /login?next=<this path> and a signed-in-but-unfunded
+     * account to /account/wallet instead, so a link straight into the
+     * catalog survives either detour.
      *
      * @var list<string>
      */
-    private const CATALOG_LOGIN_REQUIRED = [
+    private const MARKETPLACE_GATE_PATHS = [
         '/collection',
         '/collection/results',
         '/shop',
+        '/latest',
     ];
 
     /** Same gate, for routes with a path parameter. @var list<string> */
-    private const CATALOG_LOGIN_REQUIRED_PATTERNS = [
+    private const MARKETPLACE_GATE_PATTERNS = [
         '#^/nft/[^/]+$#',
         '#^/products/[^/]+$#',
+        '#^/products/[^/]+/buy$#',
+        // The NFT purchase-confirmation screen (OrderController::confirm())
+        // renders the item's name, image and price before any payment is
+        // taken - the same catalogue detail /nft/{id} shows, just on a
+        // different path. It was never in the old login-only gate either;
+        // closing it here rather than leaving it as the one checkout path
+        // that skips the marketplace check entirely.
+        '#^/buy/[^/]+$#',
     ];
 
     /**
@@ -73,23 +85,29 @@ final class Router
      *
      * @var list<string>
      */
-    private const CATALOG_LOGIN_REQUIRED_PREFIXES = [
+    private const MARKETPLACE_GATE_PREFIXES = [
         '/media',
     ];
 
-    private static function catalogGateApplies(string $path): bool
+    /**
+     * True when a path is part of the gated marketplace - used here to
+     * decide whether to run the access guard before dispatch, and reused
+     * by the header partial to decide whether to show a marketplace nav
+     * link to a visitor who cannot follow it yet.
+     */
+    public static function marketplaceGateApplies(string $path): bool
     {
-        if (in_array($path, self::CATALOG_LOGIN_REQUIRED, true)) {
+        if (in_array($path, self::MARKETPLACE_GATE_PATHS, true)) {
             return true;
         }
 
-        foreach (self::CATALOG_LOGIN_REQUIRED_PATTERNS as $pattern) {
+        foreach (self::MARKETPLACE_GATE_PATTERNS as $pattern) {
             if (preg_match($pattern, $path) === 1) {
                 return true;
             }
         }
 
-        foreach (self::CATALOG_LOGIN_REQUIRED_PREFIXES as $prefix) {
+        foreach (self::MARKETPLACE_GATE_PREFIXES as $prefix) {
             if (str_starts_with($path, $prefix)) {
                 return true;
             }
@@ -161,8 +179,8 @@ final class Router
                 Auth::requireCsrf();
             }
 
-            if (self::catalogGateApplies($path)) {
-                Auth::requireLogin();
+            if (self::marketplaceGateApplies($path)) {
+                Auth::requireMarketplaceAccess();
             }
 
             array_shift($matches);

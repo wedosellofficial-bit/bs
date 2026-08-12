@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 /** @var array<string,mixed>|null $currentUser */
 
+use App\AccountActivation;
 use App\Auth;
 use App\Lib\Config;
 use App\Lib\Fmt;
+use App\Lib\Router;
 use App\Lib\View;
 use App\Wallet;
 
 $user = $currentUser ?? null;
 $balance = $user !== null ? Wallet::balance((int) $user['id']) : null;
+$isActivated = $user !== null && AccountActivation::isActive($user);
 
 // Config-driven so labels/hrefs can change without touching this view -
 // see the comment on the 'nav' key in app/config.php. Guests get no nav
@@ -20,12 +23,24 @@ $balance = $user !== null ? Wallet::balance((int) $user['id']) : null;
 // regardless, but showing them to a signed-out visitor still presents
 // the catalogue as if it were open to browse, which it is not - see
 // HomeController's guest landing page for the actual guest experience.
+//
+// A signed-in but not-yet-activated visitor gets the same treatment for
+// the marketplace-specific entries (Latest, Collections/Shop): the menu
+// must not offer a link into a page the server is going to bounce them
+// straight back out of. The informational entries (News, Preorder,
+// Support) are not gated and stay visible either way. Hiding the link
+// is presentation only - Router::marketplaceGateApplies() is the actual
+// enforcement, checked again server-side regardless of what this menu
+// shows.
 $nav = $user === null
     ? []
     : array_merge(
         array_map(
             static fn (array $item): array => [$item['href'], $item['label']],
-            Config::get('nav', [])
+            array_filter(
+                Config::get('nav', []),
+                static fn (array $item): bool => $isActivated || !Router::marketplaceGateApplies($item['href'])
+            )
         ),
         [['/account', 'Profile']]
     );

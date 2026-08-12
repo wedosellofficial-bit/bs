@@ -231,9 +231,16 @@ return [
     // here rather than hardcoded in the header partial so an operator can
     // relabel or reorder without touching a view. Gift cards are
     // deliberately not in this list - ask before adding one.
+    //
+    // Entries whose href is a gated marketplace path (Router::marketplaceGateApplies())
+    // are additionally hidden from a signed-in visitor who has not yet
+    // reached the activation threshold - see the header partial. News,
+    // Preorder and Support are not marketplace pages, so they stay
+    // visible regardless of activation status.
     'nav' => [
         ['href' => '/news',       'label' => $get('NAV_LABEL_NEWS', 'News')],
         ['href' => '/preorder',   'label' => $get('NAV_LABEL_PREORDER', 'Preorder')],
+        ['href' => '/latest',     'label' => $get('NAV_LABEL_LATEST', 'Latest')],
         ['href' => '/shop',       'label' => $get('NAV_LABEL_COLLECTIONS', 'Collections')],
         ['href' => '/support',    'label' => $get('NAV_LABEL_SUPPORT', 'Support')],
     ],

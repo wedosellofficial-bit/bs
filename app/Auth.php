@@ -724,6 +724,25 @@ final class Auth
         return $user;
     }
 
+    /**
+     * Marketplace guard: signed in AND funded to the activation
+     * threshold. This is the gate Router calls for every catalogue path
+     * (see Router::MARKETPLACE_GATE_PATHS) - a guest is sent through the
+     * login gate first, and a signed-in but still-pending account is
+     * turned back at this second check, before any catalogue query runs,
+     * and sent to the wallet page to fund instead.
+     */
+    public static function requireMarketplaceAccess(): array
+    {
+        $user = self::requireLogin();
+
+        if (!AccountActivation::isActive($user)) {
+            Lib\Response::redirect('/account/wallet?activate=1');
+        }
+
+        return $user;
+    }
+
 
     //-----------------------------------------------------------------
     // Flash messages
