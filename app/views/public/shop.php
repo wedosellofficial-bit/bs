@@ -12,7 +12,6 @@ declare(strict_types=1);
  * @var list<array<string,mixed>> $tags
  * @var array{min:int,max:int} $priceBounds
  * @var array<string,string> $sortOptions
- * @var bool $isMember
  */
 
 use App\Lib\Fmt;
@@ -78,7 +77,7 @@ $activeFilterCount = ($filters['category'] !== '' ? 1 : 0)
                 </label>
             </div>
 
-            <?= View::partial('partials/product-grid', ['results' => $results, 'filters' => $filters, 'isMember' => $isMember]) ?>
+            <?= View::partial('partials/product-grid', ['results' => $results, 'filters' => $filters]) ?>
         </section>
     </form>
 </div>

@@ -9,7 +9,6 @@ use App\Lib\Fmt;
 use App\Lib\Logger;
 use App\Lib\RateLimiter;
 use App\Lib\Request;
-use App\Membership;
 use App\Product;
 use App\ProductOrders;
 use InvalidArgumentException;
@@ -31,7 +30,6 @@ final class ProductController extends Controller
     {
         $filters = Product::normalizeFilters($this->filtersFromQuery());
         $results = Product::search($filters);
-        $user = Auth::user();
 
         $this->view('public/shop', [
             'title'       => 'Collections',
@@ -41,7 +39,6 @@ final class ProductController extends Controller
             'tags'        => Product::allTags(),
             'priceBounds' => Product::priceBounds(),
             'sortOptions' => Product::sortOptions(),
-            'isMember'    => Membership::isMember($user),
         ]);
     }
 
@@ -55,16 +52,12 @@ final class ProductController extends Controller
         }
 
         $user = Auth::user();
-        $isMember = Membership::isMember($user);
-        $locked = (bool) $product['category_is_members_only'] && !$isMember;
 
         $this->view('public/product-detail', [
             'title'      => (string) $product['name'],
             'product'    => $product,
             'tags'       => Product::tagsFor((int) $product['id']),
-            'isMember'   => $isMember,
-            'locked'     => $locked,
-            'price'      => Product::effectivePriceMinor($product, $isMember),
+            'price'      => (int) $product['price_minor'],
             'alreadyOwned' => $user !== null && ProductOrders::ownsProduct((int) $user['id'], (int) $product['id']),
         ]);
     }
@@ -85,7 +78,7 @@ final class ProductController extends Controller
         }
 
         try {
-            ProductOrders::purchase($userId, (int) $product['id'], Membership::isMember($user));
+            ProductOrders::purchase($userId, (int) $product['id']);
         } catch (RuntimeException $e) {
             $this->back('/products/' . $slug, 'error', $e->getMessage());
         } catch (Throwable $e) {

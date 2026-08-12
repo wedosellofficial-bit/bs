@@ -34,9 +34,9 @@ use App\Lib\Fmt;
             number_format((int) $productOrderStats['total']) . ' digital-product orders',
         ],
         [
-            'Members',
-            number_format((int) $membershipStats['members']),
-            Fmt::money((int) $membershipStats['revenue_minor']) . ' in membership fees',
+            'Active accounts',
+            number_format((int) $activeAccountCount),
+            number_format((int) $pendingAccountCount) . ' pending activation',
         ],
     ];
     foreach ($tiles as [$label, $value, $sub]):

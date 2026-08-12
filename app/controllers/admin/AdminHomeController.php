@@ -7,7 +7,6 @@ namespace App\Controllers\Admin;
 use App\Auth;
 use App\Controllers\Controller;
 use App\Database;
-use App\Membership;
 use App\Nft;
 use App\Orders;
 use App\ProductOrders;
@@ -22,7 +21,12 @@ final class AdminHomeController extends Controller
             'title'       => 'Admin',
             'orderStats'  => Orders::stats(),
             'productOrderStats' => ProductOrders::stats(),
-            'membershipStats'   => Membership::stats(),
+            'activeAccountCount' => (int) Database::scalar(
+                "SELECT COUNT(*) FROM users WHERE account_status = 'active'", [], 0
+            ),
+            'pendingAccountCount' => (int) Database::scalar(
+                "SELECT COUNT(*) FROM users WHERE account_status = 'pending'", [], 0
+            ),
             'queueCounts' => Nft::queueCounts(),
             'inventory'   => Database::first(
                 "SELECT

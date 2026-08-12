@@ -5,8 +5,6 @@ declare(strict_types=1);
 /**
  * @var array<string,mixed> $product
  * @var list<array<string,mixed>> $tags
- * @var bool $isMember
- * @var bool $locked
  * @var int $price
  * @var bool $alreadyOwned
  */
@@ -14,8 +12,6 @@ declare(strict_types=1);
 use App\Auth;
 use App\Lib\Fmt;
 use App\Lib\View;
-
-$hasMemberPrice = ($product['member_price_minor'] ?? null) !== null;
 ?>
 
 <div class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -67,21 +63,7 @@ $hasMemberPrice = ($product['member_price_minor'] ?? null) !== null;
                 <p class="text-xs uppercase tracking-[0.14em] text-ink-500">Price</p>
                 <p class="price mt-1 text-4xl text-ember-500"><?= Fmt::e(Fmt::money($price)) ?></p>
 
-                <?php if ($hasMemberPrice): ?>
-                    <p class="mt-1 text-sm text-ink-500">
-                        <?= $isMember
-                            ? 'Member price applied.'
-                            : sprintf('Members pay %s. ', Fmt::money((int) $product['member_price_minor']))
-                              . '<a href="/membership" class="text-ember-500 hover:underline">Join Billions Membership</a>' ?>
-                    </p>
-                <?php endif; ?>
-
-                <?php if ($locked): ?>
-                    <div class="mt-5 rounded-lg border border-ink-800 bg-ink-900 p-4 text-center">
-                        <p class="text-sm text-ink-300">This collection is members-only.</p>
-                        <a href="/membership" class="btn btn-primary mt-3 w-full">Join to access</a>
-                    </div>
-                <?php elseif ($alreadyOwned): ?>
+                <?php if ($alreadyOwned): ?>
                     <p class="hint mt-4 text-center">You already own this. Find your download on
                         <a href="/account/product-orders" class="text-ember-500 hover:underline">your orders page</a>.</p>
                 <?php elseif (Auth::check()): ?>

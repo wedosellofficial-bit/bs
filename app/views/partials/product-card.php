@@ -2,18 +2,10 @@
 
 declare(strict_types=1);
 
-/**
- * @var array<string,mixed> $product
- * @var bool $isMember
- */
+/** @var array<string,mixed> $product */
 
 use App\Lib\Fmt;
 use App\Lib\View;
-use App\Product;
-
-$locked = (bool) ($product['category_is_members_only'] ?? false) && !($isMember ?? false);
-$price = Product::effectivePriceMinor($product, $isMember ?? false);
-$hasMemberPrice = ($product['member_price_minor'] ?? null) !== null;
 ?>
 <article class="product-card card group overflow-hidden transition-colors hover:border-ink-700">
     <a href="/products/<?= Fmt::e(rawurlencode((string) $product['slug'])) ?>" class="block focus-visible:outline-offset-4">
@@ -23,12 +15,6 @@ $hasMemberPrice = ($product['member_price_minor'] ?? null) !== null;
                  loading="lazy"
                  decoding="async"
                  width="640" height="640">
-
-            <?php if ($locked): ?>
-                <div class="absolute inset-0 flex items-center justify-center bg-ink-950/70">
-                    <span class="badge badge-muted">Members only</span>
-                </div>
-            <?php endif; ?>
         </div>
 
         <div class="border-t border-ink-800 p-4">
@@ -44,13 +30,8 @@ $hasMemberPrice = ($product['member_price_minor'] ?? null) !== null;
                 <div>
                     <div class="text-[0.65rem] uppercase tracking-wider text-ink-600">Price</div>
                     <div class="price mt-0.5 text-base text-ember-500">
-                        <?= Fmt::e(Fmt::money($price)) ?>
+                        <?= Fmt::e(Fmt::money((int) $product['price_minor'])) ?>
                     </div>
-                    <?php if ($hasMemberPrice && !($isMember ?? false)): ?>
-                        <div class="text-[0.65rem] text-ink-500">
-                            <?= Fmt::e(Fmt::money((int) $product['member_price_minor'])) ?> for members
-                        </div>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>

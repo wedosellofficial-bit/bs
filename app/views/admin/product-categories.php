@@ -15,8 +15,7 @@ use App\Lib\Fmt;
     <section class="card p-5">
         <h2 class="text-sm font-semibold text-ink-100">Categories</h2>
         <p class="mt-1 text-xs text-ink-500">
-            Powers the Collections browser. Flag a category members-only to lock it to non-members with a
-            "join to access" prompt.
+            Powers the Collections browser.
         </p>
 
         <ul class="mt-4 divide-y divide-ink-800">
@@ -26,7 +25,6 @@ use App\Lib\Fmt;
                         <p class="truncate text-sm text-ink-100"><?= Fmt::e((string) $category['name']) ?></p>
                         <p class="text-xs text-ink-500">
                             <?= (int) $category['item_count'] ?> product(s)
-                            <?= ((bool) $category['is_members_only']) ? ' &middot; members-only' : '' ?>
                         </p>
                     </div>
                     <form method="post" action="/admin/products/categories/<?= (int) $category['id'] ?>/delete"
@@ -46,10 +44,6 @@ use App\Lib\Fmt;
             <label class="sr-only-focusable" for="cat-name">Name</label>
             <input class="field text-sm" type="text" id="cat-name" name="name" required maxlength="120"
                    placeholder="Category name">
-            <label class="check-row">
-                <input type="checkbox" name="is_members_only" value="1">
-                <span>Members-only</span>
-            </label>
             <button class="btn btn-secondary btn-sm w-full" type="submit">Add category</button>
         </form>
     </section>

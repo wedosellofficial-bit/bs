@@ -4,13 +4,27 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Auth;
 use App\Database;
 use App\Nft;
 
 final class HomeController extends Controller
 {
+    /**
+     * A guest gets a registration-first landing page with zero catalog
+     * data - no featured items, no collections, no stats - rather than
+     * the real storefront home. This is the one branch in this
+     * controller; every other page an authenticated visitor reaches is
+     * unchanged.
+     */
     public function index(): void
     {
+        if (!Auth::check()) {
+            $this->view('public/home-guest', ['title' => null]);
+
+            return;
+        }
+
         $this->view('public/home', [
             'title'       => null,
             'featured'    => $this->featured(),

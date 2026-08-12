@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Lib;
 
 use App\Auth;
-use App\Membership;
 
 /**
  * Pattern router.
@@ -20,9 +19,9 @@ use App\Membership;
  * session). A per-controller check would eventually be forgotten on
  * exactly one form.
  *
- * The membership gate is enforced here for the same reason: hiding a nav
- * link is not access control, and a per-controller check is a check that
- * a new controller can forget to add. See membershipGateApplies().
+ * The catalog login gate is enforced here for the same reason: hiding a
+ * nav link is not access control, and a per-controller check is a check
+ * that a new controller can forget to add. See catalogGateApplies().
  */
 final class Router
 {
@@ -41,80 +40,62 @@ final class Router
     ];
 
     /**
-     * Routes reachable regardless of Membership::gateMode(), when the
-     * mode is 'all' (the operator's chosen default - a full paywall).
-     * Everything here is either how a visitor becomes a member (auth,
-     * the membership page itself, funding the wallet to pay the fee) or
-     * account self-service that has to work before someone has paid
-     * anything - a non-member must still be able to log out or secure
-     * their own account.
-     *
-     * Legal pages (terms/privacy) and support/FAQ stay reachable too:
-     * they are disclosures and help content, not "the store", and most
-     * of them need to be readable before someone hands over payment.
+     * The NFT and digital-product catalog requires a signed-in session -
+     * everything else on the public site does not. This is an explicit
+     * allowlist of GATED paths, deliberately the opposite shape of the
+     * old CSRF exemption list above: the site's default posture is now
+     * open, so a new route added later is never accidentally gated
+     * unless someone deliberately lists it here. Auth::requireLogin()
+     * redirects to /login?next=<this path>, so a link straight into the
+     * catalog survives the detour through registration.
      *
      * @var list<string>
      */
-    private const MEMBERSHIP_EXEMPT = [
-        '/login', '/register', '/logout',
-        '/verify-email', '/verify-email/resend',
-        '/forgot-password', '/reset-password',
-        '/login/2fa',
-        '/membership', '/membership/join',
-        '/account', '/account/settings',
-        '/account/settings/profile', '/account/settings/password', '/account/settings/payout-address',
-        '/account/settings/2fa', '/account/settings/2fa/enable', '/account/settings/2fa/disable',
-        '/account/wallet', '/account/wallet/statement',
-        '/terms', '/privacy', '/faq', '/support',
-        '/cron/run', '/cron/migrate',
+    private const CATALOG_LOGIN_REQUIRED = [
+        '/collection',
+        '/collection/results',
+        '/shop',
     ];
 
-    /** Prefixes always exempt, regardless of gate mode. @var list<string> */
-    private const MEMBERSHIP_EXEMPT_PREFIXES = ['/admin', '/media'];
+    /** Same gate, for routes with a path parameter. @var list<string> */
+    private const CATALOG_LOGIN_REQUIRED_PATTERNS = [
+        '#^/nft/[^/]+$#',
+        '#^/products/[^/]+$#',
+    ];
 
     /**
-     * Routes gated even under the looser 'purchase' mode: the money-
-     * moving and post-purchase endpoints, not the browsing pages.
+     * Same gate, by prefix - covers NFT and product preview images
+     * (/media/... and /media/product/...) regardless of the exact shape
+     * of what follows. An image URL is only ever reachable by having
+     * already seen a catalog page, but the filename itself is not a
+     * secret, so it is closed off the same way rather than relying on
+     * that.
      *
      * @var list<string>
      */
-    private const MEMBERSHIP_PURCHASE_GATED_PATTERNS = [
-        '#^/buy/[^/]+$#',
-        '#^/products/[^/]+/buy$#',
-        '#^/account/product-orders/[^/]+/download$#',
-        '#^/download/[^/]+$#',
+    private const CATALOG_LOGIN_REQUIRED_PREFIXES = [
+        '/media',
     ];
 
-    /**
-     * Whether $path needs Auth::requireMembership() under the configured
-     * gate mode.
-     */
-    private static function membershipGateApplies(string $path): bool
+    private static function catalogGateApplies(string $path): bool
     {
-        $mode = Membership::gateMode();
-
-        if ($mode === Membership::GATE_OFF) {
-            return false;
+        if (in_array($path, self::CATALOG_LOGIN_REQUIRED, true)) {
+            return true;
         }
 
-        foreach (self::MEMBERSHIP_EXEMPT_PREFIXES as $prefix) {
+        foreach (self::CATALOG_LOGIN_REQUIRED_PATTERNS as $pattern) {
+            if (preg_match($pattern, $path) === 1) {
+                return true;
+            }
+        }
+
+        foreach (self::CATALOG_LOGIN_REQUIRED_PREFIXES as $prefix) {
             if (str_starts_with($path, $prefix)) {
-                return false;
+                return true;
             }
         }
 
-        if ($mode === Membership::GATE_PURCHASE) {
-            foreach (self::MEMBERSHIP_PURCHASE_GATED_PATTERNS as $pattern) {
-                if (preg_match($pattern, $path) === 1) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        // GATE_ALL: everything except the explicit exemptions above.
-        return !in_array($path, self::MEMBERSHIP_EXEMPT, true);
+        return false;
     }
 
     /** @param array{0:class-string,1:string} $handler */
@@ -180,8 +161,8 @@ final class Router
                 Auth::requireCsrf();
             }
 
-            if (self::membershipGateApplies($path)) {
-                Auth::requireMembership();
+            if (self::catalogGateApplies($path)) {
+                Auth::requireLogin();
             }
 
             array_shift($matches);

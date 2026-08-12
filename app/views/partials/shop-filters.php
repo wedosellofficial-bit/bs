@@ -28,7 +28,6 @@ use App\Lib\Fmt;
             <?php foreach ($categories as $category): ?>
                 <option value="<?= Fmt::e((string) $category['slug']) ?>" <?= $filters['category'] === $category['slug'] ? 'selected' : '' ?>>
                     <?= Fmt::e((string) $category['name']) ?>
-                    <?= ((bool) $category['is_members_only']) ? ' (members)' : '' ?>
                     (<?= (int) $category['item_count'] ?>)
                 </option>
             <?php endforeach; ?>

@@ -29,21 +29,13 @@ final class ProductOrders
     /**
      * Buy a product with store balance.
      *
-     * $isMember is supplied by the caller (read from the session user a
-     * moment earlier) rather than re-queried here, the same way
-     * Orders::purchase() takes an already-validated payout address - the
-     * lock protects the balance, not the membership flag, which does not
-     * change concurrently with a purchase.
-     *
      * @return array{order_id:int,balance_before:int,balance_after:int,price_minor:int}
      * @throws RuntimeException with a message safe to show the buyer.
      */
-    public static function purchase(int $userId, int $productId, bool $isMember): array
+    public static function purchase(int $userId, int $productId): array
     {
-        return Wallet::withUserLock($userId, static function (int $balanceBefore) use ($userId, $productId, $isMember): array {
-            // Activation gate: a pending account cannot check out. This
-            // is a different axis from the members-only check below -
-            // see App\AccountActivation's class docblock.
+        return Wallet::withUserLock($userId, static function (int $balanceBefore) use ($userId, $productId): array {
+            // Activation gate: a pending account cannot check out.
             if (AccountActivation::requiredToPurchase()) {
                 $buyer = Database::first('SELECT account_status FROM users WHERE id = ?', [$userId]);
                 if (!AccountActivation::isActive($buyer)) {
@@ -52,10 +44,8 @@ final class ProductOrders
             }
 
             $product = Database::first(
-                'SELECT p.id, p.name, p.status, p.price_minor, p.member_price_minor, p.deliverable_path,
-                        c.is_members_only AS category_is_members_only
+                'SELECT p.id, p.name, p.status, p.price_minor, p.deliverable_path
                    FROM products p
-                   LEFT JOIN product_categories c ON c.id = p.category_id
                   WHERE p.id = ? FOR UPDATE',
                 [$productId]
             );
@@ -68,15 +58,11 @@ final class ProductOrders
                 throw new RuntimeException('That product is not currently for sale.');
             }
 
-            if ((bool) $product['category_is_members_only'] && !$isMember) {
-                throw new RuntimeException('That collection is members-only. Join Billions Membership to buy it.');
-            }
-
             if ($product['deliverable_path'] === null) {
                 throw new RuntimeException('This product has no deliverable file attached yet. Contact support.');
             }
 
-            $price = Product::effectivePriceMinor($product, $isMember);
+            $price = (int) $product['price_minor'];
 
             if ($balanceBefore < $price) {
                 $shortfall = $price - $balanceBefore;
@@ -90,14 +76,13 @@ final class ProductOrders
             }
 
             Database::run(
-                'INSERT INTO product_orders (user_id, product_id, price_minor, currency, was_member_price, status, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+                'INSERT INTO product_orders (user_id, product_id, price_minor, currency, status, created_at)
+                 VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())',
                 [
                     $userId,
                     $productId,
                     $price,
                     \App\Lib\Config::string('ledger.currency', 'USD'),
-                    ($isMember && $product['member_price_minor'] !== null) ? 1 : 0,
                     'paid',
                 ]
             );

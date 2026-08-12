@@ -38,23 +38,6 @@ final class Product
     }
 
     /**
-     * Effective price for this viewer: the member price if the product
-     * has one and the viewer is a member, otherwise the standard price.
-     *
-     * @param array<string,mixed> $product
-     */
-    public static function effectivePriceMinor(array $product, bool $isMember): int
-    {
-        $memberPrice = $product['member_price_minor'] ?? null;
-
-        if ($isMember && $memberPrice !== null) {
-            return (int) $memberPrice;
-        }
-
-        return (int) $product['price_minor'];
-    }
-
-    /**
      * @param array<string,mixed> $input
      * @return array{category:string,tag:string,min_price:?int,max_price:?int,q:string,sort:string,page:int}
      */
@@ -114,9 +97,9 @@ final class Product
         [$column, $direction] = self::SORTS[$filters['sort']];
 
         $items = Database::all(
-            "SELECT DISTINCT p.id, p.slug, p.name, p.price_minor, p.member_price_minor, p.status,
+            "SELECT DISTINCT p.id, p.slug, p.name, p.price_minor, p.status,
                     p.image_path, p.preview_path, p.inscription_id, p.created_at,
-                    c.name AS category_name, c.slug AS category_slug, c.is_members_only AS category_is_members_only
+                    c.name AS category_name, c.slug AS category_slug
                FROM products p
                LEFT JOIN product_categories c ON c.id = p.category_id
                {$where}
@@ -200,7 +183,7 @@ final class Product
     public static function find(int $id): ?array
     {
         return Database::first(
-            'SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.is_members_only AS category_is_members_only
+            'SELECT p.*, c.name AS category_name, c.slug AS category_slug
                FROM products p
                LEFT JOIN product_categories c ON c.id = p.category_id
               WHERE p.id = ?',
@@ -212,7 +195,7 @@ final class Product
     public static function findBySlug(string $slug): ?array
     {
         return Database::first(
-            'SELECT p.*, c.name AS category_name, c.slug AS category_slug, c.is_members_only AS category_is_members_only
+            'SELECT p.*, c.name AS category_name, c.slug AS category_slug
                FROM products p
                LEFT JOIN product_categories c ON c.id = p.category_id
               WHERE p.slug = ?',

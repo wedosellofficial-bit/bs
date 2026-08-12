@@ -19,11 +19,10 @@ use App\Lib\Logger;
  * never writes a ledger entry itself, so there is no code path here that
  * could turn a customer's deposit into a non-refundable toll.
  *
- * This is also a separate axis from Membership (App\Membership): a
- * standard, non-member, *active* account can browse and buy everything
- * that is not flagged members-only. Activation is the account being
- * allowed to spend at all; membership is an optional upgrade on top of
- * that, priced separately, and does not gate checkout by itself.
+ * There is no separate paid membership tier layered on top of this -
+ * activation is the only account-level gate in this application. An
+ * active account can browse and buy everything in the catalog at one
+ * standard price.
  */
 final class AccountActivation
 {

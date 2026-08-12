@@ -11,7 +11,6 @@ use App\Lib\Config;
 use App\Lib\Logger;
 use App\Lib\Request;
 use App\Lib\Totp;
-use App\Membership;
 use App\Orders;
 use App\Ordinals;
 use App\ProductOrders;
@@ -31,7 +30,6 @@ final class AccountController extends Controller
             'owned'      => Orders::ownedByUser($userId),
             'productOrders' => ProductOrders::forUser($userId, 5),
             'statement'  => Wallet::statement($userId, 5),
-            'isMember'   => Membership::isMember($user),
             'isActive'   => AccountActivation::isActive($user),
             'minActivationMinor' => AccountActivation::minActivationMinor(),
             'announcements' => Database::all(

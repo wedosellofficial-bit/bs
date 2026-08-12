@@ -57,8 +57,7 @@ final class Orders
         return Wallet::withUserLock($userId, static function (int $balanceBefore) use ($userId, $nftId, $address): array {
             // Activation gate: a pending account cannot check out. Read
             // fresh, inside the lock, rather than trusting a value the
-            // controller fetched a moment earlier - the same reasoning as
-            // re-checking members-only status in ProductOrders::purchase().
+            // controller fetched a moment earlier.
             if (AccountActivation::requiredToPurchase()) {
                 $buyer = Database::first('SELECT account_status FROM users WHERE id = ?', [$userId]);
                 if (!AccountActivation::isActive($buyer)) {

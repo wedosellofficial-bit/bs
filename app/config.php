@@ -214,41 +214,27 @@ return [
         'admin_password' => $get('SEED_ADMIN_PASSWORD'),
     ],
 
-    // Billions Membership: an optional paid upgrade (member pricing,
-    // members-only collections), not the account gate - see
-    // 'account' below for that. `gate` controls whether membership
-    // ALSO restricts browsing/buying beyond that optional-upgrade role;
-    // see the comment on Membership::gateMode(). Defaults to 'off' - the
-    // catalog is open to browse and membership gates nothing by itself.
-    // 'purchase' and 'all' exist for an operator who wants membership
-    // itself to act as a further gate on top of account activation;
-    // changing this is a config edit, not a code change.
-    'membership' => [
-        'gate'      => $get('MEMBERSHIP_GATE', 'off'),
-        'fee_minor' => $int('MEMBERSHIP_FEE_MINOR', 5000),
-    ],
-
-    // Account activation: a new registration is `pending` until its
-    // wallet balance reaches this minimum, then App\AccountActivation
-    // flips it to `active` automatically - see that class for why this
-    // is a real, spendable deposit and never a fee. `require_...` gates
-    // checkout only; browsing is always open regardless of this setting.
+    // Account activation: the one account-level gate in this app. A new
+    // registration is `pending` until its wallet balance reaches this
+    // minimum, then App\AccountActivation flips it to `active`
+    // automatically - see that class for why this is a real, spendable
+    // deposit and never a fee. `require_...` gates checkout only - it is
+    // not what decides whether the catalog itself requires a login; see
+    // App\Lib\Router's catalog gate for that.
     'account' => [
         'min_activation_minor'          => $int('ACCOUNT_MIN_ACTIVATION_MINOR', 5000),
         'require_activation_to_purchase' => $bool('REQUIRE_ACTIVATION_TO_PURCHASE', true),
     ],
 
-    // Primary nav. Labels and hrefs live here rather than hardcoded in
-    // the header partial so an operator can relabel or reorder without
-    // touching a view - a lightweight stand-in for a full admin-editable
-    // menu, which is a larger feature than this store needs today.
-    // Gift cards are deliberately not in this list - ask before adding
-    // one; the store operator said they will add that themselves.
+    // Primary nav, shown to signed-in visitors (guests get a registration
+    // landing page instead - see HomeController). Labels and hrefs live
+    // here rather than hardcoded in the header partial so an operator can
+    // relabel or reorder without touching a view. Gift cards are
+    // deliberately not in this list - ask before adding one.
     'nav' => [
         ['href' => '/news',       'label' => $get('NAV_LABEL_NEWS', 'News')],
         ['href' => '/preorder',   'label' => $get('NAV_LABEL_PREORDER', 'Preorder')],
         ['href' => '/shop',       'label' => $get('NAV_LABEL_COLLECTIONS', 'Collections')],
-        ['href' => '/membership', 'label' => $get('NAV_LABEL_MEMBERSHIP', 'Membership')],
         ['href' => '/support',    'label' => $get('NAV_LABEL_SUPPORT', 'Support')],
     ],
 ];

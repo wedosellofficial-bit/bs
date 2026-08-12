@@ -39,7 +39,6 @@ use App\Controllers\CronController;
 use App\Controllers\DownloadController;
 use App\Controllers\HomeController;
 use App\Controllers\MediaController;
-use App\Controllers\MembershipController;
 use App\Controllers\OrderController;
 use App\Controllers\PageController;
 use App\Controllers\ProductController;
@@ -75,12 +74,6 @@ $router->get('/media/product/{variant}/{file}', [MediaController::class, 'showPr
 $router->get('/shop', [ProductController::class, 'index']);
 $router->get('/products/{slug}', [ProductController::class, 'show']);
 $router->post('/products/{slug}/buy', [ProductController::class, 'buy']);
-
-//---------------------------------------------------------------------
-// Billions Membership
-//---------------------------------------------------------------------
-$router->get('/membership', [MembershipController::class, 'show']);
-$router->post('/membership/join', [MembershipController::class, 'join']);
 
 //---------------------------------------------------------------------
 // Authentication

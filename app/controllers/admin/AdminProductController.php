@@ -101,8 +101,8 @@ final class AdminProductController extends Controller
             'INSERT INTO products
                 (slug, name, description, category_id, image_path, preview_path, preview_mime, preview_width, preview_height,
                  deliverable_path, deliverable_mime, deliverable_size, deliverable_original_name,
-                 inscription_id, price_minor, member_price_minor, status, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+                 inscription_id, price_minor, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
             [
                 $slug,
                 $data['name'],
@@ -119,7 +119,6 @@ final class AdminProductController extends Controller
                 $deliverable['original_name'],
                 $data['inscription_id'],
                 $data['price_minor'],
-                $data['member_price_minor'],
                 $data['status'],
             ]
         );
@@ -220,7 +219,7 @@ final class AdminProductController extends Controller
         Database::run(
             "UPDATE products
                 SET name = ?, description = ?, category_id = ?, inscription_id = ?,
-                    price_minor = ?, member_price_minor = ?, status = ?
+                    price_minor = ?, status = ?
                     {$imageClauses}{$deliverableClauses},
                     updated_at = UTC_TIMESTAMP()
               WHERE id = ?",
@@ -230,7 +229,6 @@ final class AdminProductController extends Controller
                 $data['category_id'],
                 $data['inscription_id'],
                 $data['price_minor'],
-                $data['member_price_minor'],
                 $data['status'],
             ], $imageParams, $deliverableParams, [$productId])
         );
@@ -299,9 +297,9 @@ final class AdminProductController extends Controller
         $slug = Product::uniqueSlugForCategory($name);
 
         Database::run(
-            'INSERT INTO product_categories (slug, name, is_members_only, is_visible, created_at)
-             VALUES (?, ?, ?, 1, UTC_TIMESTAMP())',
-            [$slug, $name, Request::postBool('is_members_only') ? 1 : 0]
+            'INSERT INTO product_categories (slug, name, is_visible, created_at)
+             VALUES (?, ?, 1, UTC_TIMESTAMP())',
+            [$slug, $name]
         );
 
         Logger::audit('admin.product_category_created', 'Category added: ' . $name, (int) $admin['id']);
@@ -337,7 +335,7 @@ final class AdminProductController extends Controller
     /**
      * @return array{
      *   name:string, description:?string, category_id:?int, inscription_id:?string,
-     *   price_minor:int, member_price_minor:?int, status:string, tags:list<string>
+     *   price_minor:int, status:string, tags:list<string>
      * }
      */
     private function validateInput(): array
@@ -350,15 +348,6 @@ final class AdminProductController extends Controller
         $price = Fmt::parseMoneyToMinor(Request::post('price'));
         if ($price <= 0) {
             throw new InvalidArgumentException('Price must be greater than zero.');
-        }
-
-        $memberPriceRaw = Request::post('member_price');
-        $memberPrice = null;
-        if ($memberPriceRaw !== '') {
-            $memberPrice = Fmt::parseMoneyToMinor($memberPriceRaw);
-            if ($memberPrice <= 0 || $memberPrice > $price) {
-                throw new InvalidArgumentException('The member price must be greater than zero and no more than the standard price.');
-            }
         }
 
         $status = Request::post('status', 'listed');
@@ -379,14 +368,13 @@ final class AdminProductController extends Controller
         $tags = $tagsRaw === '' ? [] : array_map('trim', explode(',', $tagsRaw));
 
         return [
-            'name'               => $name,
-            'description'        => Request::post('description') === '' ? null : Request::post('description'),
-            'category_id'        => $categoryId > 0 ? $categoryId : null,
-            'inscription_id'     => $inscriptionId === '' ? null : $inscriptionId,
-            'price_minor'        => $price,
-            'member_price_minor' => $memberPrice,
-            'status'             => $status,
-            'tags'               => $tags,
+            'name'           => $name,
+            'description'    => Request::post('description') === '' ? null : Request::post('description'),
+            'category_id'    => $categoryId > 0 ? $categoryId : null,
+            'inscription_id' => $inscriptionId === '' ? null : $inscriptionId,
+            'price_minor'    => $price,
+            'status'         => $status,
+            'tags'           => $tags,
         ];
     }
 }

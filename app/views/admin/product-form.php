@@ -71,15 +71,6 @@ $hasOrders = $isEdit && ($orderCount ?? 0) > 0;
             </div>
 
             <div>
-                <label class="label" for="member_price">Member price (optional)</label>
-                <input class="field field-mono" type="text" id="member_price" name="member_price" inputmode="decimal"
-                       placeholder="Same as standard price"
-                       value="<?= $isEdit && $item['member_price_minor'] !== null ? Fmt::e(Fmt::money((int) $item['member_price_minor'], false)) : '' ?>">
-            </div>
-        </div>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-            <div>
                 <label class="label" for="status">Status</label>
                 <select class="field" id="status" name="status">
                     <?php foreach (['listed', 'hidden'] as $option): ?>
@@ -89,22 +80,21 @@ $hasOrders = $isEdit && ($orderCount ?? 0) > 0;
                     <?php endforeach; ?>
                 </select>
             </div>
+        </div>
 
-            <div>
-                <label class="label" for="category_id">Category</label>
-                <select class="field" id="category_id" name="category_id">
-                    <option value="0">None</option>
-                    <?php foreach ($categories as $category): ?>
-                        <option value="<?= (int) $category['id'] ?>"
-                            <?= (int) ($item['category_id'] ?? 0) === (int) $category['id'] ? 'selected' : '' ?>>
-                            <?= Fmt::e((string) $category['name']) ?>
-                            <?= ((bool) $category['is_members_only']) ? ' (members-only)' : '' ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="hint mt-1.5">Manage categories on the
-                    <a href="/admin/products/categories" class="underline">Categories &amp; tags</a> page.</p>
-            </div>
+        <div>
+            <label class="label" for="category_id">Category</label>
+            <select class="field" id="category_id" name="category_id">
+                <option value="0">None</option>
+                <?php foreach ($categories as $category): ?>
+                    <option value="<?= (int) $category['id'] ?>"
+                        <?= (int) ($item['category_id'] ?? 0) === (int) $category['id'] ? 'selected' : '' ?>>
+                        <?= Fmt::e((string) $category['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <p class="hint mt-1.5">Manage categories on the
+                <a href="/admin/products/categories" class="underline">Categories &amp; tags</a> page.</p>
         </div>
 
         <div>

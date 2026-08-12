@@ -33,10 +33,6 @@ $status = (string) $order['status'];
                 <dt class="text-ink-500">Price</dt>
                 <dd class="price text-ink-100"><?= Fmt::e(Fmt::money((int) $order['price_minor'])) ?></dd>
             </div>
-            <div class="flex justify-between gap-4">
-                <dt class="text-ink-500">Member price used</dt>
-                <dd class="text-ink-200"><?= ((bool) $order['was_member_price']) ? 'Yes' : 'No' ?></dd>
-            </div>
         </dl>
 
         <h2 class="mt-6 text-sm font-semibold text-ink-100">Downloads</h2>

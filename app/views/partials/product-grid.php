@@ -5,7 +5,6 @@ declare(strict_types=1);
 /**
  * @var array{items:list<array<string,mixed>>,total:int,page:int,pages:int} $results
  * @var array<string,mixed> $filters
- * @var bool $isMember
  */
 
 use App\Lib\Fmt;
@@ -26,7 +25,7 @@ if ($results['items'] === []): ?>
 <?php else: ?>
     <div class="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         <?php foreach ($results['items'] as $product): ?>
-            <?= View::partial('partials/product-card', ['product' => $product, 'isMember' => $isMember ?? false]) ?>
+            <?= View::partial('partials/product-card', ['product' => $product]) ?>
         <?php endforeach; ?>
     </div>
 

@@ -7,7 +7,6 @@ declare(strict_types=1);
  * @var list<array<string,mixed>> $owned
  * @var list<array<string,mixed>> $productOrders
  * @var list<array<string,mixed>> $statement
- * @var bool $isMember
  * @var bool $isActive
  * @var int $minActivationMinor
  * @var list<array<string,mixed>> $announcements
@@ -65,10 +64,10 @@ use App\Lib\View;
             <p class="mt-2 text-sm text-ember-500">View orders &rarr;</p>
         </a>
 
-        <a href="/membership" class="card p-5 transition-colors hover:border-ink-700">
-            <p class="text-xs uppercase tracking-wider text-ink-500">Membership</p>
-            <p class="price mt-1 text-3xl text-ink-100"><?= $isMember ? 'Member' : 'Standard' ?></p>
-            <p class="mt-2 text-sm text-ember-500"><?= $isMember ? 'View perks' : 'Join' ?> &rarr;</p>
+        <a href="/account/wallet" class="card p-5 transition-colors hover:border-ink-700">
+            <p class="text-xs uppercase tracking-wider text-ink-500">Account</p>
+            <p class="price mt-1 text-3xl text-ink-100"><?= $isActive ? 'Active' : 'Pending' ?></p>
+            <p class="mt-2 text-sm text-ember-500"><?= $isActive ? 'Ready to buy' : 'Fund to activate' ?> &rarr;</p>
         </a>
     </div>
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Auth;
 use App\Lib\Config;
 use App\Lib\Fmt;
 
@@ -24,7 +25,9 @@ $year = gmdate('Y');
             <div>
                 <h2 class="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-500">Store</h2>
                 <ul class="mt-4 space-y-2 text-sm">
-                    <li><a href="/collection" class="text-ink-300 transition-colors hover:text-ink-100">Collection</a></li>
+                    <?php if (Auth::check()): ?>
+                        <li><a href="/collection" class="text-ink-300 transition-colors hover:text-ink-100">Collection</a></li>
+                    <?php endif; ?>
                     <li><a href="/about" class="text-ink-300 transition-colors hover:text-ink-100">About</a></li>
                     <li><a href="/faq" class="text-ink-300 transition-colors hover:text-ink-100">FAQ</a></li>
                 </ul>

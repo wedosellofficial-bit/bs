@@ -13,9 +13,25 @@ declare(strict_types=1);
 
 use App\Lib\Config;
 use App\Lib\Fmt;
+use App\Lib\Request;
 use App\Lib\View;
 
 $storeName = Config::string('app.name', 'Billions Store');
+
+// The signup popup is a nudge for guests on the handful of pages they
+// can actually reach (the registration landing page and public info
+// pages) - never for a signed-in visitor, and never on the auth pages
+// themselves (which render through layout/auth.php, not this layout,
+// but the exclusion is kept here too as a second line of defence) or
+// legal/support pages, per the brief.
+$signupPopupExcludedPaths = [
+    '/login', '/register', '/logout',
+    '/verify-email', '/verify-email/resend',
+    '/forgot-password', '/reset-password', '/login/2fa',
+    '/terms', '/privacy', '/faq', '/support',
+];
+$showSignupPopup = ($currentUser ?? null) === null
+    && !in_array(Request::path(), $signupPopupExcludedPaths, true);
 $pageTitle = ($title ?? null) !== null
     ? $title . " \u{00B7} " . $storeName
     : $storeName . " \u{00B7} Bitcoin Ordinals";
@@ -56,6 +72,10 @@ $pageTitle = ($title ?? null) !== null
 </main>
 
 <?= View::partial('partials/footer') ?>
+
+<?php if ($showSignupPopup): ?>
+    <?= View::partial('partials/signup-popup') ?>
+<?php endif; ?>
 
 <script src="<?= Fmt::e(View::asset('js/app.js')) ?>" defer></script>
 <?php if (($needsQr ?? false) === true): ?>

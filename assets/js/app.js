@@ -647,4 +647,69 @@
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.focus();
   });
+
+  /* ==================================================================
+     Guest signup popup
+
+     Fires once per session on whichever comes first: scrolling past
+     ~40% of the page, or exit intent (pointer leaving toward the top of
+     the viewport). Native <dialog>.showModal() handles focus trapping,
+     Esc-to-close and returning focus on close - all of this only
+     decides *when* to open it and handles the click-outside case that
+     showModal() does not cover on its own. The entrance animation lives
+     entirely in CSS, gated by prefers-reduced-motion there.
+     ================================================================== */
+
+  (function initSignupPopup() {
+    const dialog = document.getElementById('signup-popup');
+    if (!dialog) return; // not rendered for signed-in visitors or excluded pages
+
+    const SHOWN_FLAG = 'bs_signup_popup_shown';
+    if (sessionStorage.getItem(SHOWN_FLAG)) return;
+
+    let triggered = false;
+
+    const trigger = () => {
+      if (triggered || sessionStorage.getItem(SHOWN_FLAG)) return;
+      triggered = true;
+
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('mouseout', onExitIntent);
+
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      }
+    };
+
+    const onScroll = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollable <= 0) return; // page doesn't scroll; exit intent is the only trigger
+
+      if (window.scrollY / scrollable >= 0.4) trigger();
+    };
+
+    const onExitIntent = (event) => {
+      // The pointer left the document entirely (no relatedTarget) via
+      // the top edge - the classic "heading for the tab bar" gesture.
+      if (event.clientY <= 0 && !event.relatedTarget) trigger();
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('mouseout', onExitIntent);
+
+    // Covers Esc (native 'cancel' -> 'close') and the close button below.
+    dialog.addEventListener('close', () => {
+      sessionStorage.setItem(SHOWN_FLAG, '1');
+    });
+
+    dialog.addEventListener('click', (event) => {
+      // A click that lands on the <dialog> element itself, rather than
+      // something inside it, landed on the backdrop's padding area.
+      if (event.target === dialog) dialog.close();
+    });
+
+    dialog.addEventListener('click', (event) => {
+      if (event.target.closest('[data-popup-close]')) dialog.close();
+    });
+  })();
 })();

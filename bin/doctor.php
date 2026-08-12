@@ -253,19 +253,10 @@ Config::bool('chain.require_taproot', true)
     ? report('ok', 'Taproot payouts required', 'yes')
     : report('warn', 'Taproot payouts required', 'DISABLED - inscriptions can be sent to wallets that lose them');
 
-// Membership gate mode. 'off' (this store's default) means membership is
-// a pure optional upgrade - the account-activation gate below is what
-// actually controls checkout, not this.
-$gate = Config::string('membership.gate', 'off');
-match ($gate) {
-    'off'      => report('ok', 'MEMBERSHIP_GATE', 'off - membership is a pure optional upgrade, gates nothing'),
-    'purchase' => report('ok', 'MEMBERSHIP_GATE', 'purchase - browsing open, buying also requires membership'),
-    'all'      => report('warn', 'MEMBERSHIP_GATE', 'all - full paywall on top of account activation; confirm that stacking is intended'),
-    default    => report('warn', 'MEMBERSHIP_GATE', "unrecognised value '{$gate}' - Router falls back to 'all'"),
-};
-
-// Account activation - the actual checkout gate. The catalog itself is
-// always browsable regardless of this; only checkout is affected.
+// Account activation - the checkout gate. Separate from the catalog
+// login gate (App\Lib\Router's CATALOG_LOGIN_REQUIRED list): that one
+// decides whether browsing needs a session at all; this one decides
+// whether a signed-in but unfunded account can check out.
 $minActivation = Config::int('account.min_activation_minor', 5000);
 $minActivation > 0
     ? report('ok', 'ACCOUNT_MIN_ACTIVATION_MINOR', Fmt::money($minActivation) . ' minimum deposit to activate')

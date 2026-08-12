@@ -14,14 +14,21 @@ $user = $currentUser ?? null;
 $balance = $user !== null ? Wallet::balance((int) $user['id']) : null;
 
 // Config-driven so labels/hrefs can change without touching this view -
-// see the comment on the 'nav' key in app/config.php. Profile is appended
-// here rather than in config because its destination depends on whether
-// anyone is signed in.
-$nav = array_map(
-    static fn (array $item): array => [$item['href'], $item['label']],
-    Config::get('nav', [])
-);
-$nav[] = $user !== null ? ['/account', 'Profile'] : ['/login', 'Profile'];
+// see the comment on the 'nav' key in app/config.php. Guests get no nav
+// at all here, not even a link routed to /login: the catalog items this
+// list is mostly made of (Collections -> /shop) are gated server-side
+// regardless, but showing them to a signed-out visitor still presents
+// the catalogue as if it were open to browse, which it is not - see
+// HomeController's guest landing page for the actual guest experience.
+$nav = $user === null
+    ? []
+    : array_merge(
+        array_map(
+            static fn (array $item): array => [$item['href'], $item['label']],
+            Config::get('nav', [])
+        ),
+        [['/account', 'Profile']]
+    );
 ?>
 <header class="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/90 backdrop-blur">
     <div class="mx-auto flex h-16 w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
@@ -31,15 +38,17 @@ $nav[] = $user !== null ? ['/account', 'Profile'] : ['/login', 'Profile'];
             <span class="hidden font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ember-500 sm:inline">Store</span>
         </a>
 
-        <nav class="ml-4 hidden items-center gap-1 md:flex" aria-label="Main">
-            <?php foreach ($nav as [$href, $label]): ?>
-                <a href="<?= Fmt::e($href) ?>"
-                   class="rounded-md px-3 py-2 text-sm transition-colors <?= View::isActive($href) ? 'bg-ink-850 text-ink-100' : 'text-ink-400 hover:text-ink-100' ?>"
-                   <?= View::isActive($href) ? 'aria-current="page"' : '' ?>>
-                    <?= Fmt::e($label) ?>
-                </a>
-            <?php endforeach; ?>
-        </nav>
+        <?php if ($nav !== []): ?>
+            <nav class="ml-4 hidden items-center gap-1 md:flex" aria-label="Main">
+                <?php foreach ($nav as [$href, $label]): ?>
+                    <a href="<?= Fmt::e($href) ?>"
+                       class="rounded-md px-3 py-2 text-sm transition-colors <?= View::isActive($href) ? 'bg-ink-850 text-ink-100' : 'text-ink-400 hover:text-ink-100' ?>"
+                       <?= View::isActive($href) ? 'aria-current="page"' : '' ?>>
+                        <?= Fmt::e($label) ?>
+                    </a>
+                <?php endforeach; ?>
+            </nav>
+        <?php endif; ?>
 
         <div class="ml-auto flex items-center gap-2">
             <?php if ($user === null): ?>
@@ -108,16 +117,15 @@ $nav[] = $user !== null ? ['/account', 'Profile'] : ['/login', 'Profile'];
         </div>
     </div>
 
-    <?php // Mobile nav row, below the bar rather than behind a hamburger. ?>
-    <nav class="flex gap-1 overflow-x-auto border-t border-ink-800 px-4 py-2 md:hidden" aria-label="Main, mobile">
-        <?php foreach ($nav as [$href, $label]): ?>
-            <a href="<?= Fmt::e($href) ?>"
-               class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm <?= View::isActive($href) ? 'bg-ink-850 text-ink-100' : 'text-ink-400' ?>">
-                <?= Fmt::e($label) ?>
-            </a>
-        <?php endforeach; ?>
-        <?php if ($user !== null): ?>
-            <a href="/account" class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm <?= View::isActive('/account') ? 'bg-ink-850 text-ink-100' : 'text-ink-400' ?>">Account</a>
-        <?php endif; ?>
-    </nav>
+    <?php if ($nav !== []): ?>
+        <?php // Mobile nav row, below the bar rather than behind a hamburger. ?>
+        <nav class="flex gap-1 overflow-x-auto border-t border-ink-800 px-4 py-2 md:hidden" aria-label="Main, mobile">
+            <?php foreach ($nav as [$href, $label]): ?>
+                <a href="<?= Fmt::e($href) ?>"
+                   class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm <?= View::isActive($href) ? 'bg-ink-850 text-ink-100' : 'text-ink-400' ?>">
+                    <?= Fmt::e($label) ?>
+                </a>
+            <?php endforeach; ?>
+        </nav>
+    <?php endif; ?>
 </header>

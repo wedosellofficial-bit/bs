@@ -17,13 +17,12 @@ no build step on the server, no long-running processes.
 | **Payment** | Site balance, topped up in BTC |
 | **Provider** | Manual — one operator-held address, credited by hand (Coinbase Commerce built in but disabled) |
 | **Transfer mode** | Manual — admin queue, no signing key on the server |
-| **Catalog access** | Open — anyone, signed in or not, can browse everything |
-| **Account activation** | A new account is `pending` until its wallet reaches `ACCOUNT_MIN_ACTIVATION_MINOR` (default $50) — an ordinary, fully spendable deposit, not a fee. `pending` can browse, not check out |
-| **Membership** | `MEMBERSHIP_GATE=off` (default) — an optional upgrade (member pricing, members-only collections), not an access gate |
+| **Catalog access** | Registration-gated — a guest gets a signup landing page at `/`, not the storefront; browsing requires a signed-in session |
+| **Account activation** | Separate from the above: a signed-in account is `pending` until its wallet reaches `ACCOUNT_MIN_ACTIVATION_MINOR` (default $50) — an ordinary, fully spendable deposit, not a fee. `pending` can browse, not check out |
 
 ---
 
-## The three things worth knowing before you read the code
+## The five things worth knowing before you read the code
 
 **1. Deposits are manual, and money is credited in exactly one place.**
 Coinbase Commerce is disabled - not every country can reach it - so
@@ -53,30 +52,41 @@ cannot move a single inscription, because this host cannot sign. That is
 the whole security argument for starting manual — automate later behind a
 spending cap and an address allowlist, not before.
 
-**4. The catalog is open; checkout is gated by account activation, not
-membership.** Anyone, signed in or not, can browse the shop, collections,
-and every product/inscription page - `MEMBERSHIP_GATE=off` by default,
-so membership gates nothing on its own. What gates checkout is a
-*separate* axis, `App\AccountActivation`: a new registration is
-`pending` until its wallet balance reaches `ACCOUNT_MIN_ACTIVATION_MINOR`
-(default $50), at which point it becomes `active` automatically - the
-moment any wallet credit brings the balance to that minimum
-(`AccountActivation::maybeActivate()`, called from `Wallet::credit()`,
-the one choke point every credit passes through). This is an ordinary,
+**4. There are two separate gates, and they answer different questions.**
+The first is *can this visitor see the catalog at all* - answered by a
+signed-in session, enforced once in `Router::dispatch()` via an explicit
+allowlist of gated paths (`Router::CATALOG_LOGIN_REQUIRED` and friends)
+and `Auth::requireLogin()`. A guest hitting `/`, `/shop`, `/collection`,
+`/nft/{id}`, `/products/{slug}`, or even a raw `/media/...` preview-image
+URL gets redirected to `/login?next=<that path>` rather than the real
+page - `HomeController` is the one exception, branching to a
+zero-catalog-data registration landing view instead of redirecting, so
+`/` itself never 404s or bounces for a guest. The second question is
+*can this signed-in account actually buy something* - answered by
+account activation, below. Conflating the two would mean either forcing
+a $50 deposit just to look around, or letting anyone with no account at
+all browse full product/NFT detail pages; this store does neither.
+
+**5. Account activation is a deposit, not a fee, and it only ever gates
+checkout.** `App\AccountActivation`: a new registration starts `pending`
+and becomes `active` automatically the moment any wallet credit brings
+its balance to `ACCOUNT_MIN_ACTIVATION_MINOR` (default $50) -
+`AccountActivation::maybeActivate()`, called from `Wallet::credit()`,
+the one choke point every credit passes through. This is an ordinary,
 fully spendable deposit. It is never converted into a fee, never
 partially withheld, and shows on the customer's statement exactly like
 any other credit - there is no code path here that turns activation into
-a charge, and if you ever find one, that is a bug. `REQUIRE_ACTIVATION_TO_PURCHASE`
-(default true) is what actually enforces the block, re-checked inside
-the same row lock as the purchase itself in both `Orders::purchase()` and
-`ProductOrders::purchase()`, not trusted from an earlier page load.
+a charge, and if you ever find one, that is a bug.
+`REQUIRE_ACTIVATION_TO_PURCHASE` (default true) is what actually enforces
+the checkout block, re-checked inside the same row lock as the purchase
+itself in both `Orders::purchase()` and `ProductOrders::purchase()`, not
+trusted from an earlier page load. A `pending` signed-in account can
+still browse everything the login gate above allows - it just cannot pay.
 
-**5. Membership (`App\Membership`) is a separate, optional upgrade layered
-on top of activation, not a second gate by default.** It buys member
-pricing on products that offer it and access to categories flagged
-members-only. `MEMBERSHIP_GATE` can still turn membership itself into a
-further gate (`purchase` or `all`) if an operator wants that later, but
-that is not this store's default - see `Membership::gateMode()`.
+There used to be a third concept, a paid "membership" tier layered on
+top of activation with its own fee and member-only pricing. It has been
+removed entirely - there is no membership anywhere in this codebase now,
+by product decision, not oversight.
 
 ---
 
@@ -101,8 +111,7 @@ that is not this store's default - see `Membership::gateMode()`.
 │   ├── Ordinals.php        taproot payout policy, inscription ids, explorers
 │   ├── Product.php         digital-art product catalog, search/filter, categories, tags
 │   ├── ProductOrders.php   the purchase transaction (products) + download tokens
-│   ├── Membership.php      Billions Membership: fee, gate mode, perk checks (optional upgrade)
-│   ├── AccountActivation.php  pending -> active at the deposit threshold (the real checkout gate)
+│   ├── AccountActivation.php  pending -> active at the deposit threshold (the checkout gate)
 │   ├── lib/                Bech32, Base58Check, Totp, RateLimiter, Mailer,
 │   │                       ImageStore, DeliverableStore, Router, View, Logger, Config, ...
 │   ├── controllers/
@@ -478,20 +487,18 @@ Refund from **Admin → Orders** if the buyer should get their money back.
 
 This is the other catalog — no chain, no transfer queue, instant delivery.
 
-1. **Admin → Products → Add product.** Name, price, and a preview image
-   (validated and re-encoded the same way as an NFT image). Optionally: a
-   member price (must be ≤ the standard price), a category, comma-separated
-   tags, and an inscription id — that field is display metadata only (see
-   the Generate button's own label in the form); it mints nothing and
-   gates nothing.
+1. **Admin → Products → Add product.** Name, one price, and a preview
+   image (validated and re-encoded the same way as an NFT image).
+   Optionally: a category, comma-separated tags, and an inscription id —
+   that field is display metadata only (see the Generate button's own
+   label in the form); it mints nothing and gates nothing.
 2. Upload the **deliverable file** — the actual thing the buyer receives.
    It is checked by magic bytes against an allowlist (image formats, PDF,
    PSD, ZIP), stored outside the web root under a random name, and never
    linked directly.
 3. Manage categories and tags from **Admin → Products → Categories & tags**.
-   Flag a category **members-only** to lock it to non-members with a
-   "join to access" prompt — the product still shows up in the catalog,
-   just not buyable.
+   Every category and every product has exactly one price - there is no
+   member/non-member split and no locked category anywhere in this build.
 4. A buyer pays from their balance and gets a **Download** button on their
    orders page immediately — no admin step. Each click mints a fresh,
    single-use, 5-minute link (`App\ProductOrders::issueDownloadToken()` /
@@ -515,20 +522,18 @@ ordinary balance. It shows on their statement, it is fully spendable,
 and there is no "activation fee" line anywhere in the ledger - only the
 deposit itself, and later, whatever they choose to spend it on.
 
-### Managing membership
+### Managing the registration gate
 
-Billions Membership is a *separate, optional* one-time fee
-(`MEMBERSHIP_FEE_MINOR`, default $50.00) that flips `users.is_member` and
-unlocks member pricing and members-only categories. It is paid through
-`Wallet::debit()` like any purchase, so it appears on the member's
-statement. It has nothing to do with account activation above - a
-standard, non-member, *active* account can already buy everything that
-is not flagged members-only.
-
-Membership can additionally act as a gate of its own, on top of
-activation, via `MEMBERSHIP_GATE` (see points 4 and 5 in the intro
-above) - `off` by default, meaning it doesn't. Changing the perks and
-changing what membership gates are two different settings on purpose.
+The catalog login gate (point 4 in the intro) is not a setting - it is
+an explicit allowlist of paths in `App\Lib\Router::CATALOG_LOGIN_REQUIRED`
+/ `..._PATTERNS` / `..._PREFIXES`. Adding a new catalog-shaped route
+later (another way to list products, say) means adding it to that list
+deliberately; the default for anything not listed is open, same as every
+other page on the site. `HomeController::index()` is the only controller
+that branches on auth state rather than redirecting - see
+`app/views/public/home-guest.php` for the guest landing page and
+`app/views/partials/signup-popup.php` for the scroll/exit-intent signup
+nudge shown on it (`assets/js/app.js`, "Guest signup popup" section).
 
 ### Crediting a deposit
 
@@ -602,9 +607,7 @@ Beyond the three points at the top:
   good has unlimited supply, so there is nothing to oversell), but the
   same-buyer race is closed the same way as an NFT purchase:
   `Wallet::withUserLock()` serialises per buyer inside
-  `ProductOrders::purchase()`. Members-only gating is re-checked inside
-  that lock from the product's own category, not trusted from what the
-  caller passed in from an earlier page load.
+  `ProductOrders::purchase()`.
 - **Downloads** — never a direct link into `storage/products/`. Every
   download goes through a single-use, 5-minute token
   (`download_tokens.token_hash`, hashed the same way as email-verification
@@ -618,15 +621,21 @@ Beyond the three points at the top:
   not a webhook signature - the endpoint that used HMAC signing is
   currently unrouted, see above). A per-controller check eventually gets
   forgotten on exactly one form.
-- **Membership gate** — off by default; when enabled, enforced in the
-  router (`Auth::requireMembership()`, called from `Router::dispatch()`),
-  the same layer CSRF is enforced in and for the same reason: a
-  per-controller check is a check a new controller can forget to add.
-  Admins bypass it unconditionally, so an admin account can never lock
-  itself out of its own panel.
-- **Account activation** — the real checkout gate, and deliberately not
-  enforced in the router: browsing must stay open regardless of it, so
-  it is instead re-checked inside `Orders::purchase()` and
+- **Catalog login gate** — enforced in the router
+  (`Router::catalogGateApplies()` + `Auth::requireLogin()`, called from
+  `Router::dispatch()`), the same layer CSRF is enforced in and for the
+  same reason: a per-controller check is a check a new controller can
+  forget to add. An explicit allowlist of gated paths, not a denylist of
+  exemptions - the site's default posture is open, so a route not on the
+  list is never accidentally gated. Covers the NFT/product catalog pages
+  *and* the media-preview endpoints (`/media/...`) - a guest gets
+  redirected to `/login?next=<path>` before any catalog HTML, JSON, or
+  image bytes are ever produced, not after. Admin routes are unaffected
+  (they have their own `Auth::requireAdmin()` guard, checked independently).
+- **Account activation** — a *separate* checkout-only gate, deliberately
+  not enforced in the router: a signed-in `pending` account must still be
+  able to browse everything the login gate above allows, so it is instead
+  re-checked inside `Orders::purchase()` and
   `ProductOrders::purchase()`, inside the same row lock as the purchase
   itself. `AccountActivation::maybeActivate()` - the only code path that
   writes `account_status` - never touches `wallet_entries`; it only ever
@@ -673,10 +682,12 @@ Beyond the three points at the top:
   AJAX-fragment pattern the NFT collection browser uses - every filter
   change is a full page load. It works with JavaScript off and needed no
   client-side wiring; it is simply slower to use than the NFT browser.
-- **A `pending` account can still see everything a member can, minus the
-  ability to check out.** There is no "preview mode" that hides prices or
-  detail pages from an unfunded account - deliberately, since the whole
-  point of this model is that browsing costs nothing.
+- **A `pending` (unfunded) *signed-in* account can still see the entire
+  catalog, minus the ability to check out.** There is no "preview mode"
+  that hides prices or detail pages from an unfunded account -
+  deliberately, since the whole point of activation is that browsing
+  costs nothing. This is different from a *guest*, who cannot reach the
+  catalog at all regardless of funding - see the login gate.
 - **Raising `ACCOUNT_MIN_ACTIVATION_MINOR` does not retroactively demote
   already-active accounts.** Activation is one-directional and checked
   only at credit time (see `AccountActivation::maybeActivate()`); an
@@ -685,3 +696,11 @@ Beyond the three points at the top:
 - **`/preorder` is a placeholder page.** Nothing in this build takes a
   preorder deposit for an unreleased item - build that separately if it's
   needed; the nav item exists so the link isn't dead.
+- **The signup popup only ever has a few pages to appear on.** Guests can
+  reach the registration landing page, `/about`, `/news`, `/preorder`,
+  `/faq`, `/support`, `/terms` and `/privacy` - the popup excludes the
+  last four by design (legal/support content, not a sales page) and the
+  auth pages themselves, leaving the landing page, `/about`, `/news` and
+  `/preorder` as where it can actually fire. That is intentional, not a
+  bug: there is no catalog left for a guest to scroll through, so there
+  is nowhere else for it to make sense.
