@@ -3,6 +3,7 @@ declare(strict_types=1);
 use App\AccountActivation;
 use App\Auth;
 use App\Lib\Fmt;
+use App\Lib\View;
 $old = $old ?? [];
 $minActivation = AccountActivation::minActivationMinor();
 ?>
@@ -13,10 +14,10 @@ $minActivation = AccountActivation::minActivationMinor();
     </p>
 
     <p class="mt-3 rounded-lg border border-ink-800 bg-ink-900 p-3 text-sm text-ink-300">
-        Browsing is free and open to everyone. To buy, fund your account with at least
-        <span class="price text-ink-100"><?= Fmt::e(Fmt::money($minActivation)) ?></span> in BTC - this is not a
-        fee: it becomes your ordinary store balance, spendable on anything, and appears on your statement like
-        any other deposit.
+        Creating an account is free and unlocks the full catalog. To buy, fund your account with at
+        least <span class="price text-ink-100"><?= Fmt::e(Fmt::money($minActivation)) ?></span> in BTC - this is
+        not a fee: it becomes your ordinary store balance, spendable on anything, and appears on your statement
+        like any other deposit.
     </p>
 
     <form method="post" action="/register" class="mt-6 space-y-4">
@@ -37,8 +38,11 @@ $minActivation = AccountActivation::minActivationMinor();
 
         <div>
             <label class="label" for="password">Password</label>
-            <input class="field" type="password" id="password" name="password" required
-                   autocomplete="new-password" minlength="12">
+            <div class="relative">
+                <input class="field pr-11" type="password" id="password" name="password" required
+                       autocomplete="new-password" minlength="12">
+                <?= View::partial('partials/password-toggle', ['for' => 'password']) ?>
+            </div>
             <p class="hint mt-1.5">
                 At least 12 characters. Length beats symbols &mdash; a few unrelated words
                 is stronger than P@ssw0rd and easier to remember.

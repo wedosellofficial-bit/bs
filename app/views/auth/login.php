@@ -2,6 +2,7 @@
 declare(strict_types=1);
 use App\Auth;
 use App\Lib\Fmt;
+use App\Lib\View;
 ?>
 <div class="card p-7">
     <h1 class="font-display text-3xl text-ink-100">Sign in</h1>
@@ -22,8 +23,11 @@ use App\Lib\Fmt;
                 <label class="label mb-0" for="password">Password</label>
                 <a href="/forgot-password" class="text-xs text-ember-500 hover:underline">Forgot it?</a>
             </div>
-            <input class="field" type="password" id="password" name="password" required
-                   autocomplete="current-password">
+            <div class="relative">
+                <input class="field pr-11" type="password" id="password" name="password" required
+                       autocomplete="current-password">
+                <?= View::partial('partials/password-toggle', ['for' => 'password']) ?>
+            </div>
         </div>
 
         <button type="submit" class="btn btn-primary w-full">Sign in</button>

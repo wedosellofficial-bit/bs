@@ -649,6 +649,30 @@
   });
 
   /* ==================================================================
+     Password visibility toggle (login, register)
+
+     Flips the input's type between password/text. Purely presentational -
+     it changes nothing about what gets submitted, hashed, or validated.
+     ================================================================== */
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-toggle-password]');
+    if (!button) return;
+
+    const targetId = button.getAttribute('data-toggle-password');
+    const input = targetId ? document.getElementById(targetId) : null;
+    if (!input) return;
+
+    const nowVisible = input.type === 'password';
+    input.type = nowVisible ? 'text' : 'password';
+
+    button.setAttribute('aria-pressed', String(nowVisible));
+    button.setAttribute('aria-label', nowVisible ? 'Hide password' : 'Show password');
+    button.querySelector('[data-toggle-password-icon-shown]')?.classList.toggle('hidden', nowVisible);
+    button.querySelector('[data-toggle-password-icon-hidden]')?.classList.toggle('hidden', !nowVisible);
+  });
+
+  /* ==================================================================
      Guest signup popup
 
      Fires once per session on whichever comes first: scrolling past

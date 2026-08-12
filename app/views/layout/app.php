@@ -19,13 +19,16 @@ use App\Lib\View;
 $storeName = Config::string('app.name', 'Billions Store');
 
 // The signup popup is a nudge for guests on the handful of pages they
-// can actually reach (the registration landing page and public info
-// pages) - never for a signed-in visitor, and never on the auth pages
-// themselves (which render through layout/auth.php, not this layout,
-// but the exclusion is kept here too as a second line of defence) or
-// legal/support pages, per the brief.
+// can actually reach - never for a signed-in visitor, and never on the
+// auth pages themselves (which render through layout/auth.php, not this
+// layout, but the exclusion is kept here too as a second line of
+// defence) or legal/support pages, per the brief. `/` is excluded too:
+// that page (public/home-guest.php) is itself entirely a registration
+// pitch, so a popup repeating the same CTA on top of it has no upside -
+// it stays on /about, /news and /preorder, where it isn't competing
+// with an identical call to action already on screen.
 $signupPopupExcludedPaths = [
-    '/login', '/register', '/logout',
+    '/', '/login', '/register', '/logout',
     '/verify-email', '/verify-email/resend',
     '/forgot-password', '/reset-password', '/login/2fa',
     '/terms', '/privacy', '/faq', '/support',
