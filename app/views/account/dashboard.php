@@ -40,31 +40,31 @@ use App\Lib\View;
     <?php endforeach; ?>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <a href="/account/wallet" class="card p-5 transition-colors hover:border-ink-700">
+        <a href="/account/wallet" class="card ambient-glow-sm p-5 transition-colors hover:border-ink-700">
             <p class="text-xs uppercase tracking-wider text-ink-500">Balance</p>
             <p class="price mt-1 text-3xl text-ink-100"><?= Fmt::e(Fmt::money($balance)) ?></p>
             <p class="mt-2 text-sm text-ember-500">Add funds &rarr;</p>
         </a>
 
-        <a href="/account/nfts" class="card p-5 transition-colors hover:border-ink-700">
+        <a href="/account/nfts" class="card ambient-glow-sm p-5 transition-colors hover:border-ink-700">
             <p class="text-xs uppercase tracking-wider text-ink-500">Inscriptions</p>
             <p class="price mt-1 text-3xl text-ink-100"><?= count($owned) ?></p>
             <p class="mt-2 text-sm text-ember-500">View them &rarr;</p>
         </a>
 
-        <a href="/account/orders" class="card p-5 transition-colors hover:border-ink-700">
+        <a href="/account/orders" class="card ambient-glow-sm p-5 transition-colors hover:border-ink-700">
             <p class="text-xs uppercase tracking-wider text-ink-500">Orders</p>
             <p class="price mt-1 text-3xl text-ink-100"><?= count($orders) ?></p>
             <p class="mt-2 text-sm text-ember-500">Track them &rarr;</p>
         </a>
 
-        <a href="/account/product-orders" class="card p-5 transition-colors hover:border-ink-700">
+        <a href="/account/product-orders" class="card ambient-glow-sm p-5 transition-colors hover:border-ink-700">
             <p class="text-xs uppercase tracking-wider text-ink-500">Downloads</p>
             <p class="price mt-1 text-3xl text-ink-100"><?= count($productOrders) ?></p>
             <p class="mt-2 text-sm text-ember-500">View orders &rarr;</p>
         </a>
 
-        <a href="/account/wallet" class="card p-5 transition-colors hover:border-ink-700">
+        <a href="/account/wallet" class="card ambient-glow-sm p-5 transition-colors hover:border-ink-700">
             <p class="text-xs uppercase tracking-wider text-ink-500">Account</p>
             <p class="price mt-1 text-3xl text-ink-100"><?= $isActive ? 'Active' : 'Pending' ?></p>
             <p class="mt-2 text-sm text-ember-500"><?= $isActive ? 'Ready to buy' : 'Fund to activate' ?> &rarr;</p>

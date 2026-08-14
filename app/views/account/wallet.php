@@ -85,7 +85,7 @@ $secondExampleMinor = $minActivationMinor * 2;
         <div class="min-w-0 space-y-6">
 
             <?php // ---------- Deposit address ---------- ?>
-            <section class="card p-6">
+            <section class="card ambient-glow p-6">
                 <h2 class="font-display text-2xl text-ink-100">Add funds</h2>
                 <p class="mt-1 text-sm text-ink-400">
                     Send BTC to the address below. Balance is credited by hand, not

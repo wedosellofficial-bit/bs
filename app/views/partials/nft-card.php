@@ -17,7 +17,7 @@ $badge = match ($status) {
     default       => ['badge-muted', ucfirst($status)],
 };
 ?>
-<article class="nft-card card group overflow-hidden transition-colors hover:border-ink-700">
+<article class="nft-card card ambient-glow-sm group overflow-hidden transition-colors hover:border-ink-700">
     <a href="/nft/<?= (int) $nft['id'] ?>" class="block focus-visible:outline-offset-4">
         <div class="art-frame">
             <img src="<?= Fmt::e(View::media($nft['preview_path'] ?? null)) ?>"

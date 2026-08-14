@@ -23,7 +23,7 @@ use App\Lib\View;
     </nav>
 
     <div class="grid gap-8 lg:grid-cols-2">
-        <div class="card overflow-hidden">
+        <div class="card ambient-glow overflow-hidden">
             <div class="art-frame">
                 <img src="<?= Fmt::e(View::productMedia($product['image_path'] ?? $product['preview_path'] ?? null, 'full')) ?>"
                      alt="<?= Fmt::e((string) $product['name']) ?>"

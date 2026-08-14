@@ -7,7 +7,7 @@ declare(strict_types=1);
 use App\Lib\Fmt;
 use App\Lib\View;
 ?>
-<article class="product-card card group overflow-hidden transition-colors hover:border-ink-700">
+<article class="product-card card ambient-glow-sm group overflow-hidden transition-colors hover:border-ink-700">
     <a href="/products/<?= Fmt::e(rawurlencode((string) $product['slug'])) ?>" class="block focus-visible:outline-offset-4">
         <div class="art-frame">
             <img src="<?= Fmt::e(View::productMedia($product['preview_path'] ?? null)) ?>"

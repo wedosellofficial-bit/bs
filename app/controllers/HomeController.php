@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\AccountActivation;
 use App\Auth;
 use App\Database;
 use App\Nft;
@@ -11,16 +12,29 @@ use App\Nft;
 final class HomeController extends Controller
 {
     /**
-     * A guest gets a registration-first landing page with zero catalog
-     * data - no featured items, no collections, no stats - rather than
-     * the real storefront home. This is the one branch in this
-     * controller; every other page an authenticated visitor reaches is
-     * unchanged.
+     * Three landing experiences, by access level - the same three states
+     * the marketplace gate itself recognises (see Router::marketplaceGateApplies()):
+     *
+     *   - guest: a registration-first landing page with zero catalog data.
+     *   - signed in, not yet activated: no catalog data either - featured
+     *     NFTs are exactly the kind of catalog preview the marketplace
+     *     gate exists to withhold, so a pending account would otherwise
+     *     see it here even though /collection and /shop turn it away.
+     *     Points at the wallet page instead.
+     *   - signed in and activated: the real storefront home.
      */
     public function index(): void
     {
-        if (!Auth::check()) {
+        $user = Auth::user();
+
+        if ($user === null) {
             $this->view('public/home-guest', ['title' => null]);
+
+            return;
+        }
+
+        if (!AccountActivation::isActive($user)) {
+            $this->view('public/home-pending', ['title' => null]);
 
             return;
         }

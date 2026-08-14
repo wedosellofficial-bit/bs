@@ -40,7 +40,7 @@ use App\Lib\View;
 
         <?php // ---------- Item ---------- ?>
         <div>
-            <div class="card overflow-hidden">
+            <div class="card ambient-glow overflow-hidden">
                 <div class="art-frame">
                     <img src="<?= Fmt::e(View::media($nft['preview_path'] ?? null)) ?>"
                          alt="<?= Fmt::e((string) $nft['name']) ?>" width="640" height="640">

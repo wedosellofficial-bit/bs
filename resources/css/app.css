@@ -327,10 +327,13 @@
 
   /* --- ambient rgb glow ---------------------------------------------
      A slowly rotating gradient ring plus a soft blurred halo behind it,
-     for the specific surfaces the brief calls out - the guest gateway's
-     create-account panel, the register/login form card, and the signup
-     popup. Deliberately not applied to catalog cards or every `.card`
-     on the site: a glow on everything reads as noise, not premium.
+     for the surfaces this reads best on: the guest/pending landing
+     panels, the register/login form, the signup popup, dashboard tiles,
+     the wallet's funding card, and product/NFT detail pages. Repeated
+     grid tiles (nft-card, product-card) use .ambient-glow-sm instead,
+     below - the same ring without the blurred halo, since dozens of
+     those can be on screen at once and the halo is the expensive part
+     to animate.
 
      Two pseudo-elements: ::before is the crisp gradient hairline (a
      donut shape, made by masking out the element's own content box, so
@@ -380,9 +383,34 @@
     to { --glow-angle: 360deg; }
   }
 
+  /* Lighter-weight sibling for grid tiles: the same rotating ring, no
+     blurred halo behind it. */
+  .ambient-glow-sm {
+    position: relative;
+    z-index: 0;
+  }
+
+  .ambient-glow-sm::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    padding: 1px;
+    z-index: -1;
+    border-radius: inherit;
+    background: conic-gradient(from var(--glow-angle),
+      #ff3d81, #7c5cff, #35b4ff, #35ffb0, #ffd23d, #ff3d81);
+    animation: ambient-glow-spin 9s linear infinite;
+    opacity: 0.6;
+    pointer-events: none;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .ambient-glow::before,
-    .ambient-glow::after {
+    .ambient-glow::after,
+    .ambient-glow-sm::before {
       animation: none;
     }
   }
