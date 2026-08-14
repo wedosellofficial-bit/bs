@@ -4,7 +4,7 @@ use App\Auth;
 use App\Lib\Fmt;
 use App\Lib\View;
 ?>
-<div class="card p-7">
+<div class="card ambient-glow p-7">
     <h1 class="font-display text-3xl text-ink-100">Sign in</h1>
     <p class="mt-1 text-sm text-ink-400">Welcome back.</p>
 

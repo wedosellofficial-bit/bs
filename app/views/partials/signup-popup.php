@@ -16,7 +16,7 @@ use App\Lib\Fmt;
 
 $minActivation = Fmt::money(AccountActivation::minActivationMinor());
 ?>
-<dialog id="signup-popup" class="signup-popup" aria-labelledby="signup-popup-title">
+<dialog id="signup-popup" class="signup-popup ambient-glow" aria-labelledby="signup-popup-title">
     <button type="button" class="signup-popup-close" data-popup-close aria-label="Close">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M2 2 12 12M12 2 2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>

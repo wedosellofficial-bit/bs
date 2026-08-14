@@ -7,7 +7,7 @@ use App\Lib\View;
 $old = $old ?? [];
 $minActivation = AccountActivation::minActivationMinor();
 ?>
-<div class="card p-7">
+<div class="card ambient-glow p-7">
     <h1 class="font-display text-3xl text-ink-100">Create an account</h1>
     <p class="mt-1 text-sm text-ink-400">
         You will need a confirmed email address before you can add funds or buy.

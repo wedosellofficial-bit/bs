@@ -10,7 +10,7 @@ use App\Lib\Fmt;
 $footerUser = Auth::user();
 $footerCanBrowse = $footerUser !== null && AccountActivation::isActive($footerUser);
 ?>
-<footer class="mt-20 border-t border-ink-800 bg-ink-950">
+<footer class="mt-20 border-t border-ink-800 bg-ink-950/85 backdrop-blur-xl">
     <div class="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div>

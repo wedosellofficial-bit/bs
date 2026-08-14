@@ -40,7 +40,7 @@ $isMinimalAuthPage = in_array(Request::path(), ['/login', '/register'], true);
 </head>
 <body class="flex min-h-screen flex-col">
 
-<header class="border-b border-ink-800">
+<header class="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/85 backdrop-blur-xl">
     <div class="mx-auto flex h-16 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8 <?= $isMinimalAuthPage ? 'justify-center' : '' ?>">
         <a href="/" class="flex items-baseline gap-2">
             <span class="font-display text-2xl text-ink-100">Billions</span>

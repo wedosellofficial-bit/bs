@@ -160,6 +160,7 @@
   }
 
   body {
+    position: relative;
     background-color: var(--color-ink-950);
     color: var(--color-ink-100);
     font-family: var(--font-sans);
@@ -170,6 +171,35 @@
     /* Everything is readable at 360px; this stops a long unbroken token
        id from widening the whole document. */
     overflow-wrap: break-word;
+    overflow-x: clip;
+  }
+
+  /* Ambient background: a handful of large, low-opacity colour blobs that
+     drift slowly behind the whole page. On their own they're barely
+     there - the point is what they give the glass `.card` surfaces
+     (below) something to actually look translucent against, instead of
+     sitting on flat black where "backdrop-blur" would have nothing
+     visible to blur. Fixed and behind everything, never intercepts
+     clicks. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -10vh -10vw;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(38rem 38rem at 14% 20%, rgb(124 92 255 / 0.16), transparent 60%),
+      radial-gradient(34rem 34rem at 86% 16%, rgb(53 180 255 / 0.14), transparent 60%),
+      radial-gradient(40rem 40rem at 24% 92%, rgb(255 61 129 / 0.11), transparent 60%),
+      radial-gradient(32rem 32rem at 82% 86%, rgb(53 255 176 / 0.10), transparent 60%);
+    filter: blur(20px);
+    animation: ambient-drift 44s ease-in-out infinite alternate;
+  }
+
+  @keyframes ambient-drift {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    50%  { transform: translate3d(-2%, 3%, 0) scale(1.06); }
+    100% { transform: translate3d(3%, -2%, 0) scale(1); }
   }
 
   h1, h2, h3 {
@@ -274,18 +304,87 @@
     letter-spacing: -0.02em;
   }
 
-  /* --- surfaces --------------------------------------------------- */
+  /* --- surfaces -----------------------------------------------------
+     Blackish and translucent rather than flat: a dark tint over
+     whatever is behind (the ambient blobs on body::before, or another
+     card in a stack) with backdrop-filter doing the actual glass blur. */
   .card {
-    background: var(--color-ink-900);
-    border: 1px solid var(--color-ink-800);
+    background-color: rgb(14 14 18 / 0.6);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid rgb(255 255 255 / 0.07);
     border-radius: var(--radius-card);
   }
 
   .card-raised {
-    background: var(--color-ink-850);
-    border: 1px solid var(--color-ink-800);
+    background-color: rgb(20 20 26 / 0.78);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    border: 1px solid rgb(255 255 255 / 0.09);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-lift);
+  }
+
+  /* --- ambient rgb glow ---------------------------------------------
+     A slowly rotating gradient ring plus a soft blurred halo behind it,
+     for the specific surfaces the brief calls out - the guest gateway's
+     create-account panel, the register/login form card, and the signup
+     popup. Deliberately not applied to catalog cards or every `.card`
+     on the site: a glow on everything reads as noise, not premium.
+
+     Two pseudo-elements: ::before is the crisp gradient hairline (a
+     donut shape, made by masking out the element's own content box, so
+     only a 1px ring survives) and ::after is the same gradient blurred
+     and enlarged behind it for the ambient light-spill. Both rotate off
+     one shared --glow-angle custom property so they stay in sync. */
+  @property --glow-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  .ambient-glow {
+    position: relative;
+    z-index: 0;
+  }
+
+  .ambient-glow::before,
+  .ambient-glow::after {
+    content: "";
+    position: absolute;
+    border-radius: inherit;
+    background: conic-gradient(from var(--glow-angle),
+      #ff3d81, #7c5cff, #35b4ff, #35ffb0, #ffd23d, #ff3d81);
+    animation: ambient-glow-spin 9s linear infinite;
+    pointer-events: none;
+  }
+
+  .ambient-glow::before {
+    inset: -1px;
+    padding: 1px;
+    z-index: -1;
+    opacity: 0.8;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .ambient-glow::after {
+    inset: -30px;
+    z-index: -2;
+    opacity: 0.4;
+    filter: blur(38px);
+  }
+
+  @keyframes ambient-glow-spin {
+    to { --glow-angle: 360deg; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ambient-glow::before,
+    .ambient-glow::after {
+      animation: none;
+    }
   }
 
   /* --- badges ----------------------------------------------------- */
@@ -614,9 +713,11 @@
     width: calc(100% - 2rem);
     margin: auto;
     padding: calc(var(--spacing) * 9) calc(var(--spacing) * 8) calc(var(--spacing) * 8);
-    border: 1px solid var(--color-ink-700);
+    border: 1px solid rgb(255 255 255 / 0.08);
     border-radius: var(--radius-card);
-    background: var(--color-ink-900);
+    background-color: rgb(14 14 18 / 0.72);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
     box-shadow: var(--shadow-lift);
     color: inherit;
     animation: signup-popup-in 220ms ease-out;
@@ -676,9 +777,11 @@
     z-index: 30;
     width: min(20rem, calc(100vw - 2.5rem));
     padding: calc(var(--spacing) * 4) calc(var(--spacing) * 5) calc(var(--spacing) * 4.5);
-    border: 1px solid var(--color-ink-700);
+    border: 1px solid rgb(255 255 255 / 0.08);
     border-radius: var(--radius-card);
-    background: var(--color-ink-900);
+    background-color: rgb(14 14 18 / 0.72);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
     box-shadow: var(--shadow-lift);
     opacity: 0;
     transform: translateY(0.5rem);
