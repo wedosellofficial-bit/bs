@@ -338,6 +338,11 @@ variables first and falls back to a `.env` file, so either works and the
 env-vars route survives a redeploy that wipes the filesystem, where a
 manually-placed `.env` file would not.
 
+**This same wipe deletes uploaded product/NFT images and deliverables
+if you don't move `storage/` out of the way first** - see "Uploaded
+images disappearing after a deploy" below. Do that before uploading any
+real product photos, not after.
+
 Either way, skip `node_modules/` if you're doing this by hand - not
 needed at runtime, and a manual upload doesn't need to bring it along.
 
@@ -457,6 +462,54 @@ don't have SSH, check by hand:
 - `https://your-domain/` → the storefront
 - **Admin → Overview** → reconciliation panel populates after the first
   cron run. If it stays empty, cron is not firing.
+
+### 10. Uploaded images disappearing after a deploy
+
+**Symptom:** you upload a product (or NFT) image in the admin panel, it
+shows fine right away, then some time later - after pushing another
+commit, or the deploy tool re-syncing on its own - it's gone from the
+customer-facing page. The listing is still there, the price is still
+right, just no image (a broken image icon, or the placeholder).
+
+**Cause:** `storage/product/`, `storage/nft/` and the rest of `storage/`
+are deliberately not tracked in git (see `.gitignore` - uploaded content
+has no business in a git history). A manual FTP/SFTP upload only ever
+*adds* files, so this never bites there. But Hostinger's git auto-deploy
+(and most others like it) doesn't add - it **re-clones the whole
+repository into `public_html` on every deploy**, which is exactly the
+"env-vars route survives a redeploy that wipes the filesystem" line back
+in step 2. `storage/` gets wiped along with everything else that isn't
+in git, the database rows still point at filenames that no longer exist
+on disk, and `MediaController` 404s on them - which is what "the image
+vanished" looks like from the storefront.
+
+**Fix:** move `storage/` outside the directory the deploy tool wipes.
+
+1. Over SSH, create a directory outside `public_html` - anywhere in your
+   account's home directory works, e.g.:
+   ```
+   mkdir -p ~/billions-storage
+   ```
+2. Copy this repo's `storage/nft`, `storage/nft/preview`, `storage/product`,
+   `storage/product/preview`, `storage/products`, `storage/logs` and
+   `storage/tmp` subdirectories into it (empty is fine on a fresh setup;
+   copy the contents across first if you already have real uploads to save).
+3. Set `APP_STORAGE=/home/u123456789/billions-storage` (your actual home
+   directory - `pwd` over SSH will show it) as a **persistent environment
+   variable** in the deploy tool's environment-variables panel, the same
+   place `APP_KEY` and friends go if you're using that route. A value set
+   in `.env` instead would be wiped on the next deploy right along with
+   `storage/` itself, which defeats the point - this has to survive the
+   redeploy, so it has to live wherever `.env` lives if you went the
+   physical-file route (i.e. re-create it after every deploy, same as
+   `.env`), or in the persistent panel if you didn't.
+4. Run `php bin/doctor.php` - its **Storage** section reports whether
+   `app.storage` (whatever `APP_STORAGE` resolves to) is writable and
+   explicitly warns if it's still inside the deployed tree.
+
+`app/config.php`'s `'app.storage'` key already reads `APP_STORAGE` with
+the in-tree `storage/` as its default, so nothing else needs changing -
+this is purely a one-time server-side setup step, not a code change.
 
 ---
 

@@ -113,7 +113,15 @@ return [
         // reset) and for encrypting stored TOTP secrets at rest.
         'key'        => base64_decode($get('APP_KEY'), true) ?: '',
         'root'       => $root,
-        'storage'    => $root . '/storage',
+        // Defaults inside the deployed tree, same as every other path
+        // here - but this one holds uploaded product/NFT images and
+        // deliverables, which a git auto-deploy that re-clones the whole
+        // tree on every push (Hostinger's, among others) deletes right
+        // along with everything else not tracked in git. Setting
+        // APP_STORAGE to an absolute path outside the deploy target
+        // (created once, e.g. over SSH) keeps uploads across redeploys -
+        // see "Uploaded images disappearing after a deploy" in the README.
+        'storage'    => $get('APP_STORAGE', $root . '/storage'),
         'views'      => __DIR__ . '/views',
         'migrations' => __DIR__ . '/migrations',
         // Cache-buster appended to asset URLs. Bump on deploy; falls back

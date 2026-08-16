@@ -153,27 +153,7 @@ count($fonts) >= 7
     : report('warn', 'self-hosted fonts', count($fonts) . ' of 7 - run: npm run fonts');
 
 //---------------------------------------------------------------------
-section('Storage');
-
-foreach ([
-    'storage', 'storage/nft', 'storage/nft/preview',
-    'storage/product', 'storage/product/preview', 'storage/products',
-    'storage/logs', 'storage/tmp',
-] as $dir) {
-    $full = $root . '/' . $dir;
-
-    if (!is_dir($full)) {
-        report('fail', $dir . '/', 'missing - create it');
-        continue;
-    }
-
-    is_writable($full)
-        ? report('ok', $dir . '/', 'writable')
-        : report('fail', $dir . '/', 'not writable by PHP - chmod 755');
-}
-
-//---------------------------------------------------------------------
-section('Configuration');
+section('Environment file');
 
 $envPath = $root . '/.env';
 
@@ -200,6 +180,48 @@ use App\Lib\Config;
 use App\Lib\Fmt;
 use App\Lib\Migrator;
 use App\Ordinals;
+
+//---------------------------------------------------------------------
+// Run against the actually-configured storage path (APP_STORAGE if set,
+// the in-tree default otherwise) - not a hardcoded one - since checking
+// the wrong directory here would pass while every upload still 404s.
+section('Storage');
+
+$storageRoot = Config::string('app.storage', $root . '/storage');
+$storageInTree = rtrim($storageRoot, '/') === rtrim($root . '/storage', '/');
+
+foreach ([
+    '', '/nft', '/nft/preview',
+    '/product', '/product/preview', '/products',
+    '/logs', '/tmp',
+] as $dir) {
+    $full = $storageRoot . $dir;
+    $label = 'storage' . $dir . '/';
+
+    if (!is_dir($full)) {
+        report('fail', $label, "missing - create {$full}");
+        continue;
+    }
+
+    is_writable($full)
+        ? report('ok', $label, 'writable')
+        : report('fail', $label, 'not writable by PHP - chmod 755');
+}
+
+if ($storageInTree) {
+    report(
+        'warn',
+        'Storage location',
+        'inside the deployed tree (' . $storageRoot . ') - a git auto-deploy that re-clones on every '
+            . 'push (Hostinger\'s among others) will delete every uploaded image/deliverable here on the '
+            . 'next deploy. Set APP_STORAGE to a path outside public_html to avoid this - see the README.'
+    );
+} else {
+    report('ok', 'Storage location', 'outside the deployed tree (' . $storageRoot . ') - survives a redeploy');
+}
+
+//---------------------------------------------------------------------
+section('Configuration');
 
 $appEnv = Config::string('app.env');
 report($appEnv === 'production' ? 'ok' : 'warn', 'APP_ENV', $appEnv
